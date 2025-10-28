@@ -11,7 +11,8 @@ from .models import (
     Prescription,
     Ward,
     Bed,
-    StaffProfile
+    StaffProfile,
+    Notification
 )
 
 
@@ -27,3 +28,4 @@ admin.site.register(Prescription)
 admin.site.register(Ward)
 admin.site.register(Bed)
 admin.site.register(StaffProfile)
+admin.site.register(Notification)

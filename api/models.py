@@ -259,3 +259,26 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.job_title}"
+    
+
+
+
+class Notification(models.Model):
+    # The user who this notification is for
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    
+    # The notification message
+    message = models.TextField()
+    
+    # Status fields
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Optional: A link to quickly navigate (e.g., /appointments/12)
+    link = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"Notification for {self.user.username}: {self.message[:30]}..."
+
+    class Meta:
+        ordering = ['-created_at'] # Show newest notifications first
