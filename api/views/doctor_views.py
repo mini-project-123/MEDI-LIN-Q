@@ -355,3 +355,24 @@ class DoctorAppointmentListView(generics.ListAPIView):
         
         return queryset
 
+
+class DoctorProfileManageView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Handles GET, PATCH, and DELETE requests for the logged-in doctor's
+    own DoctorProfile.
+    """
+    serializer_class = DoctorProfileSerializer
+    permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
+
+    def get_object(self):
+        """
+        This is the key. Instead of getting a PK from the URL,
+        we return the profile linked to the logged-in user.
+        """
+        try:
+            # Return the profile associated with the user making the request
+            return self.request.user.doctorprofile
+        except DoctorProfile.DoesNotExist:
+            # This should ideally not happen if they completed step 2 reg
+            return None
+

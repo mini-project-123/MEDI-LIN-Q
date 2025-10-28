@@ -6,7 +6,8 @@ from api.views.doctor_views import (
   DoctorPatientListView, 
   PatientDetailForDoctorView, 
   PatientSummaryAIView,
-  DoctorAppointmentListView)
+  DoctorAppointmentListView,
+  DoctorProfileManageView)
 
 urlpatterns = [
     # Doctor Profile Creation (Step 2 of registration)
@@ -16,5 +17,6 @@ urlpatterns = [
     path('doctor/patients/<int:pk>/', PatientDetailForDoctorView.as_view(), name='doctor-patient-detail'),
     path('patients/<int:pk>/summary/', PatientSummaryAIView.as_view(), name='patient-summary-ai'),
     path('doctor/appointments/', DoctorAppointmentListView.as_view(), name='doctor-appointment-list'),
+    path('profile/doctor/manage/', DoctorProfileManageView.as_view(), name='doctor-profile-manage'),
     # All future doctor dashboard URLs will go in this list
 ]
