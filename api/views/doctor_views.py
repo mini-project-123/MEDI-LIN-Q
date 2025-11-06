@@ -374,5 +374,5 @@ class DoctorProfileManageView(generics.RetrieveUpdateDestroyAPIView):
             return self.request.user.doctorprofile
         except DoctorProfile.DoesNotExist:
             # This should ideally not happen if they completed step 2 reg
-            return None
+            raise Http404("Doctor profile has not been created yet.")
 
