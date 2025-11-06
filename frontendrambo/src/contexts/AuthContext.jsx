@@ -1,7 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
+import { jwtDecode } from 'jwt-decode' // We just installed this
 
 const AuthContext = createContext()
+
+// --- 1. CREATE THE CENTRAL API CLIENT ---
+// This instance will be used by our entire application to talk to the backend.
+// Your vite.config.js file correctly proxies '/api' to 'http://localhost:8000/api'
+const apiClient = axios.create({
+  baseURL: '/api' // Uses the proxy
+});
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -13,179 +21,149 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true) // Keep loading true on init
 
   useEffect(() => {
-    // Initialize demo users if not exists
-    const existingUsers = localStorage.getItem('mockUsers')
-    if (!existingUsers) {
-      const demoUsers = [
-        {
-          id: 1,
-          name: 'Dr. Sarah Johnson',
-          email: 'doctor@medlinq.com',
-          role: 'doctor',
-          specialization: 'Cardiology',
-          hospitalId: 'H001',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 2,
-          name: 'John Patient',
-          email: 'patient@medlinq.com',
-          role: 'patient',
-          dateOfBirth: '1990-01-01',
-          age: 34,
-          emergencyContactName: 'Jane Patient',
-          emergencyContactNumber: '+1234567890',
-          allergies: 'None',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 3,
-          name: 'Admin User',
-          email: 'admin@medlinq.com',
-          role: 'admin',
-          hospitalName: 'City General Hospital',
-          hospitalAddress: '123 Medical Street, City',
-          createdAt: new Date().toISOString()
-        }
-      ]
-      localStorage.setItem('mockUsers', JSON.stringify(demoUsers))
-    }
-
-    // Remove auto-login - user must login manually
-    setLoading(false)
-  }, [])
-
-  const fetchUser = async () => {
+    // --- 2. CHECK FOR A REAL TOKEN ON APP LOAD ---
+    // This replaces your mock user logic.
+    setLoading(true)
     try {
-      // Mock API call - get user from localStorage
-      const currentUser = localStorage.getItem('currentUser')
-      if (currentUser) {
-        setUser(JSON.parse(currentUser))
+      const token = localStorage.getItem('token')
+      if (token) {
+        // We found a token! Let's decode it to get user info.
+        const decodedToken = jwtDecode(token);
+        
+        // Check if token is expired (exp is in seconds, Date.now() in ms)
+        const isExpired = decodedToken.exp * 1000 < Date.now();
+        
+        if (isExpired) {
+          // If token is expired, throw an error to be caught below
+          throw new Error("Token expired");
+        }
+
+        // --- 3. SET THE USER STATE FROM THE TOKEN ---
+        // This data comes from our MyTokenObtainPairSerializer in Django
+        setUser({
+          // The token from our backend has 'first_name', not 'name'
+          name: decodedToken.first_name, 
+          role: decodedToken.role,
+          profile_complete: decodedToken.profile_complete,
+        });
+
+        // --- 4. TELL AXIOS TO USE THIS TOKEN FOR ALL FUTURE REQUESTS ---
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
       } else {
-        throw new Error('No user found')
+        throw new Error("No token found");
       }
     } catch (error) {
-      console.log('No user session found')
+      // No valid token, so user is logged out.
+      setUser(null)
       localStorage.removeItem('token')
-      localStorage.removeItem('currentUser')
+      localStorage.removeItem('refreshToken')
+      delete apiClient.defaults.headers.common['Authorization'];
     } finally {
       setLoading(false)
     }
-  }
+  }, []) // This empty array means it only runs once when the app loads
 
   const login = async (credentials) => {
+    // --- 5. CONNECT THE REAL LOGIN FUNCTION ---
     try {
-      // Mock API call - simulate backend response
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate network delay
+      // Make the API call to our Django backend's /api/login/
+      const response = await apiClient.post('/login/', {
+        // Note: Our backend login view expects 'username', not 'email'
+        // But our UserCreationSerializer sets username = email, so this is correct.
+        username: credentials.email, 
+        password: credentials.password
+      });
+
+      // Get the tokens from the response
+      const { access, refresh } = response.data;
+
+      // Save tokens to localStorage
+      localStorage.setItem('token', access);
+      localStorage.setItem('refreshToken', refresh);
+
+      // Decode the new token to get user data
+      const decodedToken = jwtDecode(access);
       
-      // Check if user exists in localStorage (mock database)
-      const existingUsers = JSON.parse(localStorage.getItem('mockUsers') || '[]')
-      const user = existingUsers.find(u => 
-        u.email === credentials.email && 
-        u.role === credentials.role
-      )
+      // Set the user state
+      setUser({
+        name: decodedToken.first_name,
+        role: decodedToken.role,
+        profile_complete: decodedToken.profile_complete,
+      });
+
+      // Set the default Authorization header for all future requests
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${access}`;
       
-      if (!user) {
-        return { 
-          success: false, 
-          error: 'Invalid credentials or user not found' 
-        }
-      }
-      
-      // Mock successful login
-      const token = 'mock-jwt-token-' + Date.now()
-      const userData = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        specialization: user.specialization,
-        hospitalId: user.hospitalId
-      }
-      
-      localStorage.setItem('token', token)
-      localStorage.setItem('currentUser', JSON.stringify(userData))
-      setUser(userData)
-      
-      return { success: true }
+      return { success: true, role: decodedToken.role, profile_complete: decodedToken.profile_complete };
+
     } catch (error) {
+      console.error('Login failed:', error.response?.data);
+      // Return a user-friendly error
       return { 
         success: false, 
-        error: 'Login failed' 
-      }
+        error: error.response?.data?.detail || 'Invalid credentials or server error.' 
+      };
     }
   }
 
   const signup = async (userData) => {
+    // --- 6. CONNECT THE REAL SIGNUP FUNCTION ---
     try {
-      // Mock API call - simulate backend response
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate network delay
-      
-      // Get existing users from localStorage (mock database)
-      const existingUsers = JSON.parse(localStorage.getItem('mockUsers') || '[]')
-      
-      // Check if user already exists
-      const userExists = existingUsers.find(u => u.email === userData.email)
-      if (userExists) {
-        return { 
-          success: false, 
-          error: 'User with this email already exists' 
-        }
-      }
-      
-      // Create new user
-      const newUser = {
-        id: Date.now(),
-        name: userData.name,
+      // Prepare the data for the backend serializer
+      // This maps the frontend form fields (from Signup.jsx) to the backend (auth_serializers.py)
+      const dataToSubmit = {
         email: userData.email,
+        password: userData.password,
+        password2: userData.confirmPassword,
         role: userData.role,
-        dateOfBirth: userData.dateOfBirth,
-        age: userData.age,
-        specialization: userData.specialization,
-        hospitalId: userData.hospitalId,
-        hospitalName: userData.hospitalName,
-        hospitalAddress: userData.hospitalAddress,
-        emergencyContactName: userData.emergencyContactName,
-        emergencyContactNumber: userData.emergencyContactNumber,
-        allergies: userData.allergies,
-        createdAt: new Date().toISOString()
-      }
-      
-      // Save to mock database
-      existingUsers.push(newUser)
-      localStorage.setItem('mockUsers', JSON.stringify(existingUsers))
-      
-      // Mock successful signup
-      const token = 'mock-jwt-token-' + Date.now()
-      const userResponse = {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        specialization: newUser.specialization,
-        hospitalId: newUser.hospitalId
-      }
-      
-      localStorage.setItem('token', token)
-      localStorage.setItem('currentUser', JSON.stringify(userResponse))
-      setUser(userResponse)
-      
-      return { success: true }
+        
+        // Frontend sends 'firstName', backend expects 'first_name'
+        first_name: userData.firstName || '', 
+        
+        // Frontend sends 'lastName', backend expects 'last_name'
+        last_name: userData.lastName || '',
+        
+        // Frontend sends 'hospitalName', backend expects 'hospital_name'
+        hospital_name: userData.hospitalName || ''
+      };
+
+      // Make the API call to our Django backend's /api/register/
+      await apiClient.post('/register/', dataToSubmit);
+
+      // If signup is successful, automatically log the user in
+      // (This is a great user experience)
+      return await login({ 
+        email: userData.email, 
+        password: userData.password 
+      });
+
     } catch (error) {
+      console.error('Signup failed:', error.response?.data);
+      // Format the error from the backend serializer
+      let formattedError = 'Signup failed. Please try again.';
+      if (error.response?.data) {
+        // Get the first error message from the backend
+        const errorKey = Object.keys(error.response.data)[0];
+        formattedError = error.response.data[errorKey][0];
+      }
       return { 
         success: false, 
-        error: 'Signup failed' 
-      }
+        error: formattedError
+      };
     }
   }
 
   const logout = () => {
+    // --- 7. UPDATE LOGOUT ---
+    // This logic removes the token from storage AND from the axios client
     localStorage.removeItem('token')
-    localStorage.removeItem('currentUser')
+    localStorage.removeItem('refreshToken')
     setUser(null)
+    delete apiClient.defaults.headers.common['Authorization'];
   }
 
   const value = {
@@ -193,12 +171,13 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     logout,
-    loading
+    loading,
+    apiClient // --- 8. PROVIDE THE API CLIENT TO THE APP ---
   }
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   )
 }

@@ -142,3 +142,6 @@ AUTH_USER_MODEL = 'api.User'
 GOOGLE_API_KEY = "AIzaSyBinnnxNVU8AZ-m2lvlsf7B87RRWJjJItU"
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
