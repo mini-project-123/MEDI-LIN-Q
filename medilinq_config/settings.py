@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "api",
     "rest_framework",
     "rest_framework_simplejwt",
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -80,7 +81,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "medilinq_db",
         "USER": "postgres",
-        "PASSWORD": "Vrajbhoomi@89",
+        "PASSWORD": "shreyaF2006*",
         "HOST": "localhost",
         "PORT": "5432",
     }

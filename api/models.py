@@ -11,23 +11,17 @@ class User(AbstractUser):
         ('patient', 'Patient'),
         ('doctor', 'Doctor'),
         ('hospital_admin', 'Hospital Admin'),
+        ('staff', 'Staff'),  # <-- Your change is here
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     custom_id = models.CharField(max_length=20, unique=True, blank=True, editable=False)
     middle_name = models.CharField(max_length=50, blank=True)
     
     GENDER_CHOICES = (('male', 'Male'), ('female', 'Female'), ('other', 'Other'))
-    # UPDATED: Made optional to allow for two-step registration
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
-    
     date_of_birth = models.DateField(null=True, blank=True)
-    
-    # UPDATED: Made optional to allow for two-step registration
     contact_no = models.CharField(max_length=15, blank=True, null=True)
-    
-    # UPDATED: Made optional to allow for two-step registration
     address = models.TextField(blank=True, null=True)
-    
     updated_at = models.DateTimeField(auto_now=True)
     
     groups = models.ManyToManyField(
@@ -55,22 +49,20 @@ class User(AbstractUser):
         return None
 
     def save(self, *args, **kwargs):
-        # This logic runs just before a user is saved.
         if not self.custom_id:
             prefix = ''
             if self.role == 'patient':
                 prefix = 'PT'
             elif self.role == 'doctor':
                 prefix = 'DC'
-            # UPDATED: Added logic to handle the hospital admin role
             elif self.role == 'hospital_admin':
-                # Admins don't need a public-facing ID, but we give them one for database uniqueness.
                 prefix = 'AD'
+            elif self.role == 'staff': # <-- Your change is here
+                prefix = 'ST'
             
             if prefix:
                 while True:
                     year = date.today().year
-                    # Let's make admin IDs shorter as they aren't as important
                     random_num = random.randint(100, 999) if prefix == 'AD' else random.randint(1000, 9999)
                     new_id = f"{prefix}-{year}-{random_num}"
                     if not User.objects.filter(custom_id=new_id).exists():
@@ -94,10 +86,7 @@ class Hospital(models.Model):
     operating_hours = models.CharField(max_length=100)
     num_departments = models.PositiveIntegerField(default=1)
     photo = models.ImageField(upload_to='hospital_photos/', null=True, blank=True)
-    
-    # NEW: This field creates the relationship to the admin users.
     admins = models.ManyToManyField(User, related_name='hospitals_administered', limit_choices_to={'role': 'hospital_admin'})
-    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -121,9 +110,9 @@ class Hospital(models.Model):
 # =====================================================================
 class PatientProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='patientprofile', limit_choices_to={'role': 'patient'})
-    blood_group = models.CharField(max_length=5, blank=True, null=True) # Made optional for step-2
-    emergency_contact_no = models.CharField(max_length=15, blank=True, null=True) # Made optional for step-2
-    emergency_contact_relation = models.CharField(max_length=50, blank=True, null=True) # Made optional for step-2
+    blood_group = models.CharField(max_length=5, blank=True, null=True)
+    emergency_contact_no = models.CharField(max_length=15, blank=True, null=True)
+    emergency_contact_relation = models.CharField(max_length=50, blank=True, null=True)
     allergies = models.TextField(blank=True)
     photo = models.ImageField(upload_to='patient_photos/', null=True, blank=True)
 
@@ -135,11 +124,11 @@ class PatientProfile(models.Model):
 # =====================================================================
 class DoctorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='doctorprofile', limit_choices_to={'role': 'doctor'})
-    specialization = models.CharField(max_length=100, blank=True, null=True) # Made optional for step-2
-    qualification = models.CharField(max_length=255, blank=True, null=True) # Made optional for step-2
-    experience_years = models.PositiveIntegerField(blank=True, null=True) # Made optional for step-2
-    available_days = models.CharField(max_length=100, help_text="e.g., Monday, Wednesday, Friday", blank=True, null=True) # Made optional for step-2
-    languages_spoken = models.CharField(max_length=255, help_text="e.g., English, Hindi, Kannada", blank=True, null=True) # Made optional for step-2
+    specialization = models.CharField(max_length=100, blank=True, null=True)
+    qualification = models.CharField(max_length=255, blank=True, null=True)
+    experience_years = models.PositiveIntegerField(blank=True, null=True)
+    available_days = models.CharField(max_length=100, help_text="e.g., Monday, Wednesday, Friday", blank=True, null=True)
+    languages_spoken = models.CharField(max_length=255, help_text="e.g., English, Hindi, Kannada", blank=True, null=True)
     hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, blank=True, related_name='doctors')
     photo = models.ImageField(upload_to='doctor_photos/', null=True, blank=True)
     
@@ -184,7 +173,12 @@ class Appointment(models.Model):
 # 6. MEDICAL REPORT MODEL
 # =====================================================================
 class MedicalReport(models.Model):
-    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='reports')
+    # === THIS IS THE FIX ===
+    # An admin can upload a report without an appointment (e.g., old records)
+    # so we make the appointment optional.
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='reports', null=True, blank=True)
+    # === END OF FIX ===
+    
     patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name='medical_reports')
     report_type = models.CharField(max_length=100, help_text="e.g., Prescription, Lab Test Result")
     description = models.TextField()
