@@ -4,49 +4,36 @@ Python / Django
 
 ===================================================================
 
-Virtual Environment
-
-This is the most important one! Never share your 'venv'.
-
+# Virtual Environment (never commit this)
 venv/
 /venv/
 
-Python cache files
-
-pycache/
+# Python cache files
+__pycache__/
 *.pyc
 
-Local development database
-
+# Local development database
 db.sqlite3
 db.sqlite3-journal
 
-Environment variables
-
-Contains secret keys (like your Google API key, database password)
-
+# Environment variables (SECRET KEYS, passwords)
 .env
 .env.*
 *.env
 
-User-uploaded files
-
-You generally don't track user-uploaded media in Git
-
+# User-uploaded files
 /media/
 
-Collected static files for production
-
+# Collected static files
 /static/
 
-AI Models (if you save them locally)
-
+# AI Model files (if any)
 *.joblib
 *.pth
 
 ===================================================================
 
-Node.js / React / Vite (for your 'frontend' folder)
+Node.js / React / Vite (if frontend present)
 
 ===================================================================
 
@@ -55,13 +42,11 @@ node_modules/
 /node_modules/
 /frontend/node_modules/
 
-Build output folder
-
+# Build output
 dist/
 /frontend/dist/
 
-Log files
-
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -69,15 +54,15 @@ yarn-error.log*
 
 ===================================================================
 
-IDE / OS specific files (Good to ignore)
+# IDE / OS specific files
 
 ===================================================================
 
-VS Code
-
+# VS Code workspace data
 .vscode/
 !.vscode/settings.json
 !.vscode/extensions.json
 !.vscode/launch.json
 
-Py
+# macOS
+.DS_Store
