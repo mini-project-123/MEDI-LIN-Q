@@ -1,7 +1,10 @@
 # api/serializers/patient_serializers.py
 
 from rest_framework import serializers
-from api.models import User, PatientProfile, Appointment, MedicalReport, Prescription, Medication
+from api.models import (
+    User, PatientProfile, Appointment, MedicalReport, 
+    Prescription, Medication, DoctorProfile, Hospital # <-- Add DoctorProfile and Hospital
+)
 
 # --- Re-usable Serializer for User ---
 class SimplePatientUserSerializer(serializers.ModelSerializer):
@@ -144,3 +147,66 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
             'notes',
             'dry_run' # Our special flag
         ]
+class PublicHospitalSerializer(serializers.ModelSerializer):
+    """
+    Shows simple, public-safe info about a hospital.
+    """
+    class Meta:
+        model = Hospital
+        fields = ['id', 'custom_id', 'name', 'address', 'operating_hours', 'photo']
+
+
+class PublicDoctorSerializer(serializers.ModelSerializer):
+    """
+    Shows public-safe info about a doctor for booking.
+    """
+    # Nest the user's name
+    user = SimplePatientUserSerializer(read_only=True)
+    # Nest the hospital's name
+    hospital = PublicHospitalSerializer(read_only=True)
+    
+    class Meta:
+        model = DoctorProfile
+        fields = [
+            'user', 
+            'specialization', 
+            'qualification', 
+            'experience_years', 
+            'available_days',
+            'languages_spoken',
+            'hospital',
+            'photo'
+        ]
+
+# --- Serializer for Creating a Booking (Step 2B) ---
+
+class AppointmentCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for a Patient to create a new appointment.
+    """
+    # The patient will provide the ID for the doctor and hospital
+    doctor = serializers.PrimaryKeyRelatedField(queryset=DoctorProfile.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'doctor', 
+            'hospital', 
+            'appointment_datetime',
+        ]
+        # Note: 'patient' and 'status' are set automatically in the view
+
+    def validate(self, data):
+        """
+        Optional: Add validation to ensure the doctor works at the hospital.
+        """
+        doctor = data.get('doctor')
+        hospital = data.get('hospital')
+        
+        if doctor and hospital and doctor.hospital != hospital:
+            raise serializers.ValidationError("This doctor does not work at the selected hospital.")
+            
+        # You could also add validation to check if the slot is available
+        
+        return data
