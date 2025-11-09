@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/AuthContext' // Correct path
 import { UserPlus, Mail, Lock, User } from 'lucide-react'
 
-const Signup = () => {
+const Signup = () => { // Changed back to const Signup
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -47,26 +47,17 @@ const Signup = () => {
 
     setLoading(true)
 
-    // Set name based on role
-    const submitData = { ...formData }
-    if (formData.role === 'hospital') {
-      submitData.name = formData.hospitalName
-    } else {
-      submitData.name = `${formData.firstName} ${formData.lastName}`.trim()
-    }
-
-    const result = await signup(submitData)
+    // We just pass the raw formData.
+    // The signup function in AuthContext will handle all the data mapping.
+    const result = await signup(formData)
     
     if (result.success) {
       // Show success message
-      alert(`Welcome to MedLinq! Account created successfully for ${formData.name}.`)
+      alert(`Welcome to MedLinq! Account created successfully. Please log in.`)
       
-      // For doctors, redirect to profile completion
-      if (formData.role === 'doctor') {
-        navigate('/dashboard?tab=profile')
-      } else {
-        navigate('/dashboard')
-      }
+      // Redirect EVERYONE to the login page
+      navigate('/login')
+
     } else {
       setError(result.error)
     }
@@ -257,10 +248,6 @@ const Signup = () => {
             </>
           )}
 
-
-
-
-
           {renderRoleSpecificFields()}
 
           {error && (
@@ -290,4 +277,4 @@ const Signup = () => {
   )
 }
 
-export default Signup
+export default Signup // Changed back to default export

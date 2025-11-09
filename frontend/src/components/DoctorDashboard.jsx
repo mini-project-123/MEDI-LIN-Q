@@ -3,6 +3,8 @@ import { Users, Calendar, Clock, TrendingUp, User, Phone, Mail, Activity, BarCha
 import SimpleChart from './SimpleChart'
 import PremiumFeatures from './PremiumFeatures'
 import SuccessStories from './SuccessStories'
+import axios from 'axios' // 1. Import axios
+import { useNavigate } from 'react-router-dom' // 2. Import useNavigate
 
 const DoctorDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null)
@@ -10,6 +12,7 @@ const DoctorDashboard = () => {
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const navigate = useNavigate() // 3. Initialize navigate
 
   useEffect(() => {
     fetchDashboardData()
@@ -19,41 +22,21 @@ const DoctorDashboard = () => {
     try {
       setLoading(true)
       
-      // Mock dashboard data
-      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate network delay
-      
-      const mockDashboardData = {
-        stat_cards: {
-          total_patients: 180,
-          todays_appointments_count: 8,
-          new_patients_this_month: 42,
-          next_appointment: {
-            id: 1,
-            appointment_datetime: '2024-01-19T10:00:00',
-            patient: {
-              user: {
-                first_name: 'Emily',
-                last_name: 'Rodriguez',
-                custom_id: 'PT003'
-              }
-            }
-          }
-        },
-        visualizations: {
-          gender_distribution: {
-            'Male': 95,
-            'Female': 85
-          },
-          age_group_distribution: {
-            '0-18': 25,
-            '19-35': 45,
-            '36-50': 60,
-            '51-65': 35,
-            '65+': 15
-          }
+      // 4. --- This is the new API Call ---
+      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/doctor_urls.py]
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.get('/api/doctor/dashboard-summary/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      }
-      
+      });
+      const data = response.data;
+
+      // The backend data structure matches what's needed
+      setDashboardData(data)
+
+      // Set mock appointments and patients for now, 
+      // as these come from different API endpoints
       const mockAppointments = [
         {
           id: 1,
@@ -106,11 +89,17 @@ const DoctorDashboard = () => {
         }
       ]
       
-      setDashboardData(mockDashboardData)
       setAppointments(mockAppointments)
       setPatients(mockPatients)
+      
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
+      // 5. --- This is the 404 check ---
+      if (error.response && (error.response.status === 404 || error.response.status === 400)) {
+        // If profile is not found (404) or a 400 error (like "Doctor profile not found.")
+        navigate('/complete-doctor-profile');
+      } else {
+        console.error('Error fetching dashboard data:', error)
+      }
     } finally {
       setLoading(false)
     }
@@ -128,7 +117,7 @@ const DoctorDashboard = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.25rem 0' }}>
-                  {stat_cards.total_patients || 180}
+                  {stat_cards.total_patients || 0}
                 </h3>
                 <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>Total Patients</p>
                 <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.8rem' }}>All time</p>
@@ -141,7 +130,7 @@ const DoctorDashboard = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.25rem 0' }}>
-                  {stat_cards.todays_appointments_count || 8}
+                  {stat_cards.todays_appointments_count || 0}
                 </h3>
                 <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>Today's Appointments</p>
                 <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.8rem' }}>Scheduled</p>
@@ -156,7 +145,7 @@ const DoctorDashboard = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.25rem 0' }}>
-                  {stat_cards.new_patients_this_month || 42}
+                  {stat_cards.new_patients_this_month || 0}
                 </h3>
                 <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>This Month</p>
                 <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.8rem' }}>New patients</p>
@@ -169,7 +158,7 @@ const DoctorDashboard = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.25rem 0' }}>
-                  {stat_cards.upcomingAppointments || 15}
+                  {stat_cards.upcomingAppointments || 0}
                 </h3>
                 <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>This Week</p>
                 <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.8rem' }}>Upcoming appointments</p>
@@ -206,24 +195,24 @@ const DoctorDashboard = () => {
               fontWeight: 'bold',
               color: 'white'
             }}>
-              {nextAppointment.patient?.user?.first_name?.charAt(0) || 'E'}
+              {nextAppointment.patient?.user?.first_name?.charAt(0) || 'N/A'}
             </div>
             <div style={{ flex: 1 }}>
               <h4 style={{ color: '#1e293b', marginBottom: '0.25rem', fontSize: '1.1rem' }}>
-                {nextAppointment.patient?.user?.first_name || 'Emily'} {nextAppointment.patient?.user?.last_name || 'Rodriguez'}
+                {nextAppointment.patient?.user?.first_name || 'N/A'} {nextAppointment.patient?.user?.last_name || ''}
               </h4>
               <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                Patient ID: {nextAppointment.patient?.user?.custom_id || 'PT003'}
+                Patient ID: {nextAppointment.patient?.user?.custom_id || 'N/A'}
               </p>
               <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                {new Date(nextAppointment.appointment_datetime || '2024-01-19T10:00:00').toLocaleDateString('en-US', { 
+                {new Date(nextAppointment.appointment_datetime).toLocaleDateString('en-US', { 
                   year: 'numeric', 
                   month: '2-digit', 
                   day: '2-digit' 
-                })} at {new Date(nextAppointment.appointment_datetime || '2024-01-19T10:00:00').toLocaleTimeString([], { 
+                })} at {new Date(nextAppointment.appointment_datetime).toLocaleTimeString([], { 
                   hour: '2-digit', 
                   minute: '2-digit' 
-                })}-{new Date(new Date(nextAppointment.appointment_datetime || '2024-01-19T10:00:00').getTime() + 60*60*1000).toLocaleTimeString([], { 
+                })}-{new Date(new Date(nextAppointment.appointment_datetime).getTime() + 60*60*1000).toLocaleTimeString([], { 
                   hour: '2-digit', 
                   minute: '2-digit' 
                 })}
@@ -247,20 +236,14 @@ const DoctorDashboard = () => {
               fontWeight: 'bold',
               color: 'white'
             }}>
-              E
+              -
             </div>
             <div style={{ flex: 1 }}>
               <h4 style={{ color: '#1e293b', marginBottom: '0.25rem', fontSize: '1.1rem' }}>
-                Emily Rodriguez
+                No Upcoming Appointments
               </h4>
               <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                Patient ID: PT003
-              </p>
-              <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                2024-01-19 at 10:00-11:00
-              </p>
-              <p style={{ color: '#3b82f6', fontSize: '0.9rem' }}>
-                General Checkup
+                Your schedule is clear.
               </p>
             </div>
           </div>
@@ -341,7 +324,7 @@ const DoctorDashboard = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {Object.entries(gender_distribution).map(([gender, count]) => (
               <div key={gender} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b', textTransform: 'capitalize' }}>{gender}</span>
+                <span style={{ color: '#64748b', textTransform: 'capitalize' }}>{gender || 'N/A'}</span>
                 <span style={{ color: '#1e293b', fontWeight: '500' }}>{count}</span>
               </div>
             ))}
@@ -445,7 +428,7 @@ const DoctorDashboard = () => {
     const { gender_distribution, age_group_distribution } = dashboardData.visualizations
 
     const genderData = Object.entries(gender_distribution).map(([key, value]) => ({
-      label: key,
+      label: key || 'N/A',
       value: value
     }))
 

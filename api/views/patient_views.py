@@ -1,7 +1,7 @@
 # api/views/patient_views.py
 
 from rest_framework import generics, permissions, views, response
-from api.serializers.patient_serializers import PatientProfileSerializer, PatientDetailSerializer, SimplePrescriptionSerializer
+from api.serializers.patient_serializers import PatientProfileSerializer, PatientDetailSerializer, SimplePrescriptionSerializer, AppointmentCancelSerializer
 from api.permissions import IsPatientUser
 from api.models import Appointment, Prescription, PatientProfile # <-- Import these
 from django.http import Http404 # <-- Import this
@@ -125,3 +125,26 @@ class AppointmentCreateView(generics.CreateAPIView):
         
         # You could also add logic here to create a notification
         # for the doctor using the create_notification util
+
+
+class PatientAppointmentManageView(generics.UpdateAPIView):
+    """
+    Allow a patient to update (cancel) their own appointment.
+    """
+    serializer_class = AppointmentCancelSerializer
+    permission_classes = [permissions.IsAuthenticated, IsPatientUser]
+
+    def get_queryset(self):
+        """
+        A patient can only manage their own appointments.
+        """
+        return Appointment.objects.filter(patient=self.request.user.patientprofile)
+
+    def perform_update(self, serializer):
+        """
+        When updating, only allow 'pending' or 'confirmed' appointments to be cancelled.
+        """
+        appointment = self.get_object()
+        if appointment.status in ['completed']:
+            raise serializers.ValidationError("Cannot cancel a completed appointment.")
+        serializer.save()

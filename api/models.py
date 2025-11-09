@@ -11,7 +11,7 @@ class User(AbstractUser):
         ('patient', 'Patient'),
         ('doctor', 'Doctor'),
         ('hospital_admin', 'Hospital Admin'),
-        ('staff', 'Staff'),  # <-- Your added role
+        ('staff', 'Staff'),
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     custom_id = models.CharField(max_length=20, unique=True, blank=True, editable=False)
@@ -55,7 +55,7 @@ class User(AbstractUser):
                 prefix = 'DC'
             elif self.role == 'hospital_admin':
                 prefix = 'AD'
-            elif self.role == 'staff':  # <-- Your added logic
+            elif self.role == 'staff':
                 prefix = 'ST'
             else:
                 prefix = ''
@@ -173,7 +173,7 @@ class Appointment(models.Model):
 # 6. MEDICAL REPORT MODEL
 # =====================================================================
 class MedicalReport(models.Model):
-    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='reports', null=True, blank=True)  # <-- Your fix
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='reports', null=True, blank=True)
     patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name='medical_reports')
     report_type = models.CharField(max_length=100)
     description = models.TextField()
@@ -183,4 +183,89 @@ class MedicalReport(models.Model):
     def __str__(self):
         return f"Report for {self.patient.user.username} from {self.created_at.date()}"
 
-# (Remaining models unchanged)
+# =====================================================================
+# 7. MEDICATION MODEL (RECONSTRUCTED)
+# =====================================================================
+class Medication(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, help_text="Optional description or usage notes for the medication.")
+
+    def __str__(self):
+        return self.name
+
+# =====================================================================
+# 8. PRESCRIPTION MODEL (RECONSTRUCTED)
+# =====================================================================
+class Prescription(models.Model):
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='prescriptions')
+    medication = models.ForeignKey(Medication, on_delete=models.PROTECT, related_name='prescriptions')
+    dosage = models.CharField(max_length=100, help_text="e.g., '1 tablet', '5 ml'")
+    frequency = models.CharField(max_length=100, help_text="e.g., 'Twice a day after meals'")
+    duration = models.CharField(max_length=100, help_text="e.g., 'For 7 days'")
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Prescription for {self.appointment.patient.user.username} - {self.medication.name}"
+
+# =====================================================================
+# 9. ARTICLE MODEL (RECONSTRUCTED)
+# =====================================================================
+class Article(models.Model):
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    status = models.CharField(max_length=10, choices=[('draft', 'Draft'), ('published', 'Published')], default='draft')
+    author = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='articles')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+
+# =====================================================================
+# 10. STAFF PROFILE MODEL (RECONSTRUCTED)
+# =====================================================================
+class StaffProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='staffprofile', limit_choices_to={'role': 'staff'})
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='staff_members')
+    job_title = models.CharField(max_length=100, help_text="e.g., Nurse, Receptionist, Lab Technician")
+
+    def __str__(self):
+        return f"Staff: {self.user.first_name} {self.user.last_name} ({self.job_title})"
+
+# =====================================================================
+# 11. WARD MODEL (RECONSTRUCTED)
+# =====================================================================
+class Ward(models.Model):
+    name = models.CharField(max_length=100, help_text="e.g., General Ward, ICU, Maternity")
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='wards')
+
+    def __str__(self):
+        return f"{self.name} - {self.hospital.name}"
+
+# =====================================================================
+# 12. BED MODEL (RECONSTRUCTED)
+# =====================================================================
+class Bed(models.Model):
+    bed_number = models.CharField(max_length=20)
+    ward = models.ForeignKey(Ward, on_delete=models.CASCADE, related_name='beds')
+    patient = models.OneToOneField(PatientProfile, on_delete=models.SET_NULL, null=True, blank=True)
+    is_occupied = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Bed {self.bed_number} - {self.ward.name}"
+
+# =====================================================================
+# 13. NOTIFICATION MODEL (RECONSTRUCTED)
+# =====================================================================
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    link = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Notification for {self.user.username}: {self.message[:20]}..."

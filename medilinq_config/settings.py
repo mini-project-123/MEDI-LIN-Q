@@ -71,11 +71,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "medilinq_db",
         "USER": "postgres",
-<<<<<<< HEAD
-        "PASSWORD": "Ashu@0609",
-=======
-        "PASSWORD": "shreyaF2006*",   # your correct DB password
->>>>>>> 614477cf38751a12c5c45ccaaa3f59893a3cbd70
+        "PASSWORD": "Vrajbhoomi@89",
         "HOST": "localhost",
         "PORT": "5432",
     }

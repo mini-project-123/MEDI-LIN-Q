@@ -131,9 +131,9 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
             'frequency',
             'duration',
             'notes',
-<<<<<<< HEAD
             'dry_run' # Our special flag
         ]
+
 class PublicHospitalSerializer(serializers.ModelSerializer):
     """
     Shows simple, public-safe info about a hospital.
@@ -197,7 +197,22 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         # You could also add validation to check if the slot is available
         
         return data
-=======
-            'dry_run'
-        ]
->>>>>>> 614477cf38751a12c5c45ccaaa3f59893a3cbd70
+    
+
+
+class AppointmentCancelSerializer(serializers.ModelSerializer):
+    """
+    Serializer to allow a patient to update the status of an appointment.
+    We only allow setting it to 'cancelled'.
+    """
+    class Meta:
+        model = Appointment
+        fields = ['status']
+
+    def validate_status(self, value):
+        """
+        Check that the new status is 'cancelled'.
+        """
+        if value != 'cancelled':
+            raise serializers.ValidationError("You can only update the status to 'cancelled'.")
+        return value

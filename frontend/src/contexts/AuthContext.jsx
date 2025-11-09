@@ -1,219 +1,178 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import axios from 'axios' // <-- 1. ADD THIS IMPORT
 
-const AuthContext = createContext()
+// Create Context
+export const AuthContext = createContext()
 
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
-}
-
+// AuthProvider Component
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] =useState(null)
+  const [loading, setLoading] = useState(true) // Start loading by default
 
   useEffect(() => {
-    // Initialize demo users - always ensure hospital user exists
-    const demoUsers = [
-      {
-        id: 1,
-        name: 'Dr. Sarah Johnson',
-        email: 'doctor@medlinq.com',
-        role: 'doctor',
-        specialization: 'Cardiology',
-        hospitalId: 'H001',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 2,
-        name: 'John Patient',
-        email: 'patient@medlinq.com',
-        role: 'patient',
-        dateOfBirth: '1990-01-01',
-        age: 34,
-        emergencyContactName: 'Jane Patient',
-        emergencyContactNumber: '+1234567890',
-        allergies: 'None',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 3,
-        name: 'City General Hospital',
-        email: 'hospital@medlinq.com',
-        role: 'hospital',
-        hospitalName: 'City General Hospital',
-        createdAt: new Date().toISOString()
-      }
-    ]
-    
-    // Check if hospital user exists, if not, reinitialize
-    const existingUsers = localStorage.getItem('mockUsers')
-    if (!existingUsers) {
-      localStorage.setItem('mockUsers', JSON.stringify(demoUsers))
-    } else {
-      const users = JSON.parse(existingUsers)
-      const hasHospital = users.some(u => u.role === 'hospital')
-      if (!hasHospital) {
-        // Add hospital user to existing users
-        const hospitalUser = demoUsers.find(u => u.role === 'hospital')
-        users.push(hospitalUser)
-        localStorage.setItem('mockUsers', JSON.stringify(users))
+    // This effect runs when the app first loads
+    // It tries to set the user if a token is present
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      try {
+        decodeAndSetUser(token)
+      } catch (error) {
+        console.error("Invalid token on load", error)
+        localStorage.removeItem('accessToken')
       }
     }
-
-    // Remove auto-login - user must login manually
     setLoading(false)
   }, [])
 
-  const fetchUser = async () => {
+  // NEW HELPER FUNCTION
+  // This decodes the JWT token to get the user's info
+  const decodeAndSetUser = (token) => {
     try {
-      // Mock API call - get user from localStorage
-      const currentUser = localStorage.getItem('currentUser')
-      if (currentUser) {
-        setUser(JSON.parse(currentUser))
-      } else {
-        throw new Error('No user found')
-      }
+      const payloadBase64 = token.split('.')[1]
+      const decodedPayload = atob(payloadBase64)
+      const decodedUser = JSON.parse(decodedPayload)
+      
+      // The backend token payload contains role, email, etc.
+      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/serializers/auth_serializers.py]
+      setUser({
+        id: decodedUser.user_id,
+        email: decodedUser.email,
+        role: decodedUser.role,
+        profile_complete: decodedUser.profile_complete,
+        // We'll add name later by fetching from a profile endpoint
+      });
     } catch (error) {
-      console.log('No user session found')
-      localStorage.removeItem('token')
-      localStorage.removeItem('currentUser')
-    } finally {
-      setLoading(false)
+      console.error("Failed to decode token", error)
+      setUser(null)
+      localStorage.removeItem('accessToken')
     }
   }
 
-  const login = async (credentials) => {
-    try {
-      // Mock API call - simulate backend response
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate network delay
-      
-      // Check if user exists in localStorage (mock database)
-      const existingUsers = JSON.parse(localStorage.getItem('mockUsers') || '[]')
-      console.log('Existing users:', existingUsers)
-      console.log('Login credentials:', credentials)
-      
-      const user = existingUsers.find(u => 
-        u.email === credentials.email && 
-        u.role === credentials.role
-      )
-      
-      console.log('Found user:', user)
-      
-      if (!user) {
-        return { 
-          success: false, 
-          error: 'Invalid credentials or user not found' 
-        }
-      }
-      
-      // Mock successful login
-      const token = 'mock-jwt-token-' + Date.now()
-      const userData = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        specialization: user.specialization,
-        hospitalId: user.hospitalId,
-        hospitalName: user.hospitalName
-      }
-      
-      localStorage.setItem('token', token)
-      localStorage.setItem('currentUser', JSON.stringify(userData))
-      setUser(userData)
-      
-      return { success: true }
-    } catch (error) {
-      return { 
-        success: false, 
-        error: 'Login failed' 
-      }
-    }
-  }
 
+  // --- 2. REPLACE THE OLD signup FUNCTION WITH THIS ---
   const signup = async (userData) => {
     try {
-      // Mock API call - simulate backend response
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate network delay
-      
-      // Get existing users from localStorage (mock database)
-      const existingUsers = JSON.parse(localStorage.getItem('mockUsers') || '[]')
-      
-      // Check if user already exists
-      const userExists = existingUsers.find(u => u.email === userData.email)
-      if (userExists) {
-        return { 
-          success: false, 
-          error: 'User with this email already exists' 
-        }
-      }
-      
-      // Create new user
-      const newUser = {
-        id: Date.now(),
-        name: userData.name,
+      // 1. Prepare the data for the backend
+      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/serializers/auth_serializers.py]
+      const postData = {
+        first_name: userData.firstName,
+        last_name: userData.lastName,
         email: userData.email,
         role: userData.role,
-        dateOfBirth: userData.dateOfBirth,
-        age: userData.age,
-        specialization: userData.specialization,
-        hospitalId: userData.hospitalId,
-        hospitalName: userData.hospitalName,
-        hospitalAddress: userData.hospitalAddress,
-        emergencyContactName: userData.emergencyContactName,
-        emergencyContactNumber: userData.emergencyContactNumber,
-        allergies: userData.allergies,
-        createdAt: new Date().toISOString()
+        password: userData.password,
+        password2: userData.confirmPassword
+      };
+
+      // 2. Handle the special case for the 'hospital' role
+      if (postData.role === 'hospital') {
+        postData.first_name = userData.hospitalName;
+        postData.last_name = ''; // Last name can be blank
+        // Map frontend 'hospital' role to backend 'hospital_admin' role
+        // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/models.py]
+        postData.role = 'hospital_admin'; 
+        postData.password2 = userData.password;
       }
-      
-      // Save to mock database
-      existingUsers.push(newUser)
-      localStorage.setItem('mockUsers', JSON.stringify(existingUsers))
-      
-      // Mock successful signup
-      const token = 'mock-jwt-token-' + Date.now()
-      const userResponse = {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        specialization: newUser.specialization,
-        hospitalId: newUser.hospitalId
-      }
-      
-      localStorage.setItem('token', token)
-      localStorage.setItem('currentUser', JSON.stringify(userResponse))
-      setUser(userResponse)
-      
-      return { success: true }
+
+      // 3. Make the API call
+      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/auth_urls.py]
+      await axios.post("/api/register/", postData);
+
+      // 4. On success, return success.
+      return { success: true };
+
     } catch (error) {
-      return { 
-        success: false, 
-        error: 'Signup failed' 
+      // 5. Handle errors from the backend
+      let errorMessage = 'Signup failed. Please try again.';
+      if (error.response && error.response.data) {
+        const errors = error.response.data;
+        const errorKey = Object.keys(errors)[0];
+        if (errorKey && Array.isArray(errors[errorKey])) {
+          errorMessage = errors[errorKey][0];
+        } else if (typeof errors === 'string') {
+          errorMessage = errors;
+        } else if (errors.email) {
+          errorMessage = errors.email[0];
+        } else if (errors.password) {
+          errorMessage = errors.password[0];
+        }
       }
+      return {
+        success: false,
+        error: errorMessage
+      };
     }
   }
+  // --- END OF signup FUNCTION ---
 
+
+  // --- 3. REPLACE THE MOCK login FUNCTION WITH THIS ---
+  const login = async (credentials) => {
+    try {
+      // 1. Prepare data for the backend.
+      // The backend expects 'username', but we set username to be email upon creation.
+      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/serializers/auth_serializers.py]
+      const postData = {
+        username: credentials.email,
+        password: credentials.password
+      };
+
+      // 2. Make the API call
+      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/auth_urls.py]
+      const response = await axios.post('/api/login/', postData);
+      
+      const { access, refresh } = response.data;
+
+      // 3. Save tokens and set user
+      localStorage.setItem('accessToken', access);
+      localStorage.setItem('refreshToken', refresh);
+      
+      decodeAndSetUser(access); // Use our new helper
+      
+      return { success: true };
+
+    } catch (error) {
+      // Handle failed login
+      let errorMessage = "Invalid credentials. Please try again.";
+      if (error.response && error.response.data && error.response.data.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      return { 
+        success: false, 
+        error: errorMessage
+      };
+    }
+  }
+  // --- END OF NEW login FUNCTION ---
+
+  // --- 4. USE THE REAL logout FUNCTION ---
   const logout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('currentUser')
     setUser(null)
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
   }
 
+  // Value provided to consumers
   const value = {
     user,
+    loading,
     login,
-    signup,
     logout,
-    loading
+    signup,
+    fetchUser: decodeAndSetUser // Expose this function
   }
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   )
+}
+
+// Custom hook to use AuthContext
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
 }

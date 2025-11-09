@@ -6,7 +6,8 @@ from api.views.patient_views import (
     PatientDashboardDetailView,
     PublicDoctorListView,  # <-- Import
     PublicHospitalListView, # <-- Import
-    AppointmentCreateView   # <-- Import
+    AppointmentCreateView,   # <-- Import
+    PatientAppointmentManageView
 )
 
 urlpatterns = [
@@ -21,4 +22,5 @@ urlpatterns = [
     path('booking/doctors/', PublicDoctorListView.as_view(), name='public-doctor-list'),
     path('booking/hospitals/', PublicHospitalListView.as_view(), name='public-hospital-list'),
     path('booking/create/', AppointmentCreateView.as_view(), name='appointment-create'),
+    path('appointments/<int:pk>/manage/', PatientAppointmentManageView.as_view(), name='patient-appointment-manage'),
 ]
