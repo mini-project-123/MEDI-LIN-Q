@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { User, Edit, Save, X, Building2, Award, Calendar, Languages } from 'lucide-react'
+import axios from 'axios' // 1. IMPORT AXIOS
+import { useAuth } from '../contexts/AuthContext' // 2. IMPORT useAuth
 
 const DoctorProfile = () => {
+  const { user } = useAuth() // Get the logged-in user
   const [profile, setProfile] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -12,41 +15,61 @@ const DoctorProfile = () => {
     experience_years: '',
     available_days: '',
     languages_spoken: '',
-    hospital: '',
+    hospital: '', // This will just be an ID
     photo: null
   })
+  
+  // 3. We'll need a list of hospitals for the dropdown
+  const [hospitals, setHospitals] = useState([])
+
 
   useEffect(() => {
     fetchProfile()
+    fetchHospitals() // Fetch hospitals for the edit form
   }, [])
 
+  // 4. NEW FUNCTION to fetch the doctor's own profile
   const fetchProfile = async () => {
     setLoading(true)
-    // Mock profile data from localStorage
-    const savedProfile = localStorage.getItem('doctorProfile')
-    const mockProfile = savedProfile ? JSON.parse(savedProfile) : {
-      user: { first_name: 'Dr. Sarah', last_name: 'Johnson', email: 'sarah.johnson@hospital.com' },
-      specialization: 'Cardiology',
-      qualification: 'MD, FACC',
-      experience_years: 15,
-      available_days: 'Monday to Friday',
-      languages_spoken: 'English, Spanish',
-      hospital: 'City General Hospital'
-    }
-    
-    setTimeout(() => {
-      setProfile(mockProfile)
+    try {
+      const token = localStorage.getItem('accessToken');
+      //
+      const response = await axios.get('/api/profile/doctor/manage/', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const profileData = response.data;
+      setProfile(profileData);
+      
+      // Pre-fill the edit form with the fetched data
       setEditForm({
-        specialization: mockProfile.specialization || '',
-        qualification: mockProfile.qualification || '',
-        experience_years: mockProfile.experience_years || '',
-        available_days: mockProfile.available_days || '',
-        languages_spoken: mockProfile.languages_spoken || '',
-        hospital: mockProfile.hospital || '',
-        photo: null
-      })
-      setLoading(false)
-    }, 500)
+        specialization: profileData.specialization || '',
+        qualification: profileData.qualification || '',
+        experience_years: profileData.experience_years || '',
+        available_days: profileData.available_days || '',
+        languages_spoken: profileData.languages_spoken || '',
+        hospital: profileData.hospital?.id || '', // Store just the hospital ID
+        photo: null // Photo is always null on load
+      });
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setLoading(false);
+    }
+  }
+
+  // 5. NEW FUNCTION to fetch hospitals for the dropdown
+  const fetchHospitals = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      //
+      const response = await axios.get('/api/booking/hospitals/', {
+         headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setHospitals(response.data);
+    } catch (error) {
+      console.error('Error fetching hospitals:', error);
+    }
   }
 
   const handleInputChange = (e) => {
@@ -57,23 +80,48 @@ const DoctorProfile = () => {
     }))
   }
 
+  // 6. UPDATED handleSave to send a PATCH request
   const handleSave = async () => {
     setSaving(true)
     
-    // Save to localStorage
-    const updatedProfile = {
-      ...profile,
-      ...editForm
-    }
-    localStorage.setItem('doctorProfile', JSON.stringify(updatedProfile))
+    const token = localStorage.getItem('accessToken')
+    const formData = new FormData()
     
-    setTimeout(() => {
-      setProfile(updatedProfile)
+    // Append all fields to FormData
+    formData.append('specialization', editForm.specialization)
+    formData.append('qualification', editForm.qualification)
+    formData.append('experience_years', editForm.experience_years)
+    formData.append('available_days', editForm.available_days)
+    formData.append('languages_spoken', editForm.languages_spoken)
+    formData.append('hospital', editForm.hospital)
+    
+    if (editForm.photo) {
+      formData.append('photo', editForm.photo)
+    }
+
+    try {
+      //
+      const response = await axios.patch('/api/profile/doctor/manage/', formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Update the profile state with the new data from the backend
+      setProfile(response.data)
       setIsEditing(false)
+      alert('Profile updated successfully!')
+
+    } catch (error) {
+      console.error('Error saving profile:', error.response?.data || error)
+      alert('Failed to save profile. Please check your data and try again.')
+    } finally {
       setSaving(false)
-    }, 500)
+    }
   }
 
+  // 7. UPDATED handleCancel to use real profile data
   const handleCancel = () => {
     setEditForm({
       specialization: profile?.specialization || '',
@@ -81,7 +129,7 @@ const DoctorProfile = () => {
       experience_years: profile?.experience_years || '',
       available_days: profile?.available_days || '',
       languages_spoken: profile?.languages_spoken || '',
-      hospital: profile?.hospital || '',
+      hospital: profile?.hospital?.id || '',
       photo: null
     })
     setIsEditing(false)
@@ -105,7 +153,7 @@ const DoctorProfile = () => {
       <div className="card">
         <h3 style={{ color: '#1e293b', marginBottom: '1rem' }}>Doctor Profile</h3>
         <p style={{ color: '#64748b' }}>
-          No profile found. Please complete your profile setup.
+          Could not load profile. Please try refreshing the page.
         </p>
       </div>
     )
@@ -203,15 +251,21 @@ const DoctorProfile = () => {
                 <Building2 size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
                 Hospital
               </label>
-              <input
-                type="text"
+              {/* 8. UPDATED to be a dropdown menu */}
+              <select
                 name="hospital"
                 value={editForm.hospital}
                 onChange={handleInputChange}
                 className="form-input"
-                placeholder="Hospital name"
                 required
-              />
+              >
+                <option value="">Select a hospital</option>
+                {hospitals.map(hospital => (
+                  <option key={hospital.id} value={hospital.id}>
+                    {hospital.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">
@@ -255,7 +309,7 @@ const DoctorProfile = () => {
               accept="image/*"
             />
             <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-              Upload a professional photo (optional)
+              Upload a new photo (optional)
             </p>
           </div>
         </form>
@@ -263,6 +317,7 @@ const DoctorProfile = () => {
         <div>
           {/* Profile Display */}
           <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
+            {/* 9. UPDATED to use profile.photo URL from backend */}
             {profile.photo && (
               <div style={{
                 width: '120px',
@@ -279,6 +334,7 @@ const DoctorProfile = () => {
               </div>
             )}
             <div style={{ flex: 1 }}>
+              {/* 10. UPDATED to use profile.user data */}
               <h4 style={{ color: '#1e293b', marginBottom: '0.5rem', fontSize: '1.5rem' }}>
                 Dr. {profile.user?.first_name} {profile.user?.last_name}
               </h4>
@@ -321,7 +377,8 @@ const DoctorProfile = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Building2 size={16} style={{ color: '#64748b' }} />
                   <span style={{ color: '#64748b' }}>Hospital:</span>
-                  <span style={{ color: '#1e293b', fontWeight: '500' }}>{profile.hospital}</span>
+                  {/* 11. UPDATED to use profile.hospital.name */}
+                  <span style={{ color: '#1e293b', fontWeight: '500' }}>{profile.hospital?.name || 'N/A'}</span>
                 </div>
                 
                 {profile.available_days && (

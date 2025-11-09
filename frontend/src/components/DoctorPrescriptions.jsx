@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { Pill, Plus, Search, Filter, Calendar, User, FileText } from 'lucide-react'
+import axios from 'axios' // 1. IMPORT AXIOS
 
 const DoctorPrescriptions = () => {
   const [prescriptions, setPrescriptions] = useState([])
   const [filteredPrescriptions, setFilteredPrescriptions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  // 2. RENAMED searchTerm to filterMedication for clarity
+  const [filterMedication, setFilterMedication] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterPatient, setFilterPatient] = useState('')
 
@@ -15,64 +17,56 @@ const DoctorPrescriptions = () => {
 
   useEffect(() => {
     applyFilters()
-  }, [searchTerm, filterDate, filterPatient, prescriptions])
+  }, [filterMedication, filterDate, filterPatient, prescriptions])
 
+  // 3. UPDATED to fetch from the backend
   const fetchPrescriptions = async () => {
     setLoading(true)
-    // Mock prescription data
-    const mockPrescriptions = [
-      {
-        id: 1,
-        patient: { name: 'John Doe' },
-        medication: { name: 'Amoxicillin' },
-        dosage: '500mg',
-        frequency: 'Twice daily',
-        duration: '7 days',
-        date: new Date().toISOString().split('T')[0],
-        status: 'active'
-      },
-      {
-        id: 2,
-        patient: { name: 'Jane Smith' },
-        medication: { name: 'Ibuprofen' },
-        dosage: '400mg',
-        frequency: 'Three times daily',
-        duration: '5 days',
-        date: new Date().toISOString().split('T')[0],
-        status: 'active'
-      }
-    ]
-    setTimeout(() => {
-      setPrescriptions(mockPrescriptions)
-      setFilteredPrescriptions(mockPrescriptions)
+    try {
+      const token = localStorage.getItem('accessToken');
+      //
+      const response = await axios.get('/api/doctor/prescriptions/', {
+         headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setPrescriptions(response.data);
+      setFilteredPrescriptions(response.data); // Set initial filtered list
+    } catch (error) {
+      console.error('Error fetching prescriptions:', error);
+      setPrescriptions([]);
+      setFilteredPrescriptions([]);
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
+  // 4. UPDATED to use backend data structure
   const applyFilters = () => {
     let filtered = [...prescriptions]
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
+    // Medication filter (renamed from searchTerm)
+    if (filterMedication) {
+      const term = filterMedication.toLowerCase()
       filtered = filtered.filter(prescription => 
-        prescription.medication?.name?.toLowerCase().includes(term) ||
-        prescription.patient_name?.toLowerCase().includes(term)
+        prescription.medication?.name?.toLowerCase().includes(term)
       )
     }
 
     // Date filter
     if (filterDate) {
       filtered = filtered.filter(prescription => 
-        new Date(prescription.created_at).toDateString() === new Date(filterDate).toDateString()
+        //
+        prescription.prescription_date === filterDate
       )
     }
 
     // Patient filter
     if (filterPatient) {
-      filtered = filtered.filter(prescription => 
-        prescription.patient_name?.toLowerCase().includes(filterPatient.toLowerCase())
-      )
+      const patientTerm = filterPatient.toLowerCase()
+      filtered = filtered.filter(prescription => {
+        //
+        const fullName = `${prescription.patient?.user?.first_name || ''} ${prescription.patient?.user?.last_name || ''}`.toLowerCase()
+        return fullName.includes(patientTerm)
+      })
     }
 
     setFilteredPrescriptions(filtered)
@@ -106,13 +100,15 @@ const DoctorPrescriptions = () => {
           Filter Prescriptions
         </h4>
         
-        <div className="grid grid-2" style={{ gap: '1rem' }}>
+        {/* 5. UPDATED filter grid to have 3 columns */}
+        <div className="grid grid-3" style={{ gap: '1rem' }}>
           <div className="form-group">
-            <label className="form-label">Date</label>
+            <label className="form-label">Medication Name</label>
             <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
+              type="text"
+              placeholder="Search by medication..."
+              value={filterMedication}
+              onChange={(e) => setFilterMedication(e.target.value)}
               className="form-input"
             />
           </div>
@@ -127,11 +123,21 @@ const DoctorPrescriptions = () => {
               className="form-input"
             />
           </div>
+
+          <div className="form-group">
+            <label className="form-label">Date</label>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="form-input"
+            />
+          </div>
         </div>
 
         <button 
           onClick={() => {
-            setSearchTerm('')
+            setFilterMedication('')
             setFilterDate('')
             setFilterPatient('')
           }}
@@ -152,6 +158,11 @@ const DoctorPrescriptions = () => {
           <h3 style={{ color: '#1e293b' }}>
             All Prescriptions ({filteredPrescriptions.length})
           </h3>
+          {/* We will add the "Create" functionality in a later step */}
+          <button className="btn btn-primary" disabled={true}>
+            <Plus size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
+            Create Prescription (Soon)
+          </button>
         </div>
 
         {filteredPrescriptions.length > 0 ? (
@@ -176,11 +187,12 @@ const DoctorPrescriptions = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                       <Pill size={24} style={{ color: '#3b82f6' }} />
                       <div>
+                        {/* 6. UPDATED data path */}
                         <h4 style={{ color: '#1e293b', marginBottom: '0.25rem' }}>
                           {prescription.medication?.name || 'Unknown Medication'}
                         </h4>
                         <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                          Patient: {prescription.patient_name}
+                          Patient: {prescription.patient?.user?.first_name} {prescription.patient?.user?.last_name}
                         </p>
                       </div>
                     </div>
@@ -195,7 +207,8 @@ const DoctorPrescriptions = () => {
                       fontSize: '0.75rem',
                       textAlign: 'center'
                     }}>
-                      {new Date(prescription.created_at).toLocaleDateString()}
+                      {/* 7. UPDATED data path */}
+                      {new Date(prescription.prescription_date).toLocaleDateString()}
                     </div>
                     <div style={{ 
                       padding: '0.375rem 0.75rem',
@@ -206,7 +219,8 @@ const DoctorPrescriptions = () => {
                       fontWeight: '500',
                       textAlign: 'center'
                     }}>
-                      ID: {prescription.patient_id}
+                      {/* 8. UPDATED data path */}
+                      ID: {prescription.patient?.user?.custom_id}
                     </div>
                   </div>
                 </div>
@@ -219,6 +233,7 @@ const DoctorPrescriptions = () => {
                     border: '1px solid #e5e7eb',
                     fontSize: '0.8rem'
                   }}>
+                    {/* 9. All these fields are correct */}
                     <strong>Dosage:</strong> {prescription.dosage}
                   </div>
                   
@@ -242,36 +257,7 @@ const DoctorPrescriptions = () => {
                     <strong>Duration:</strong> {prescription.duration}
                   </div>
 
-                  <div style={{ 
-                    padding: '0.5rem 0.75rem',
-                    backgroundColor: 'white',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.8rem'
-                  }}>
-                    <strong>Start:</strong> {new Date(prescription.start_date).toLocaleDateString()}
-                  </div>
-                  
-                  <div style={{ 
-                    padding: '0.5rem 0.75rem',
-                    backgroundColor: 'white',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb',
-                    fontSize: '0.8rem'
-                  }}>
-                    <strong>End:</strong> {new Date(prescription.end_date).toLocaleDateString()}
-                  </div>
-                  
-                  <div style={{ 
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.8rem',
-                    fontWeight: '500',
-                    backgroundColor: new Date(prescription.end_date) >= new Date() ? '#dcfce7' : '#fee2e2',
-                    color: new Date(prescription.end_date) >= new Date() ? '#166534' : '#dc2626'
-                  }}>
-                    {new Date(prescription.end_date) >= new Date() ? 'Active' : 'Expired'}
-                  </div>
+                  {/* 10. REMOVED start_date, end_date, and status as they aren't in the serializer */}
                 </div>
 
                 {prescription.notes && (
@@ -287,18 +273,7 @@ const DoctorPrescriptions = () => {
                   </div>
                 )}
 
-                {prescription.instructions && (
-                  <div style={{ 
-                    padding: '0.75rem', 
-                    backgroundColor: '#fef3c7', 
-                    borderRadius: '0.5rem',
-                    marginBottom: '1rem'
-                  }}>
-                    <p style={{ color: '#92400e', fontSize: '0.9rem' }}>
-                      <strong>Instructions:</strong> {prescription.instructions}
-                    </p>
-                  </div>
-                )}
+                {/* 11. REMOVED instructions as it's not in the serializer */}
 
                 <div style={{ 
                   display: 'flex', 
@@ -327,7 +302,7 @@ const DoctorPrescriptions = () => {
               No prescriptions found
             </p>
             <p style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-              Prescriptions will appear here after patient consultations
+              Prescriptions you write will appear here.
             </p>
           </div>
         )}

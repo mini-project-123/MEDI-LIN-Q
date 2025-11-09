@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
       const decodedUser = JSON.parse(decodedPayload)
       
       // The backend token payload contains role, email, etc.
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/serializers/auth_serializers.py]
+      //
       setUser({
         id: decodedUser.user_id,
         email: decodedUser.email,
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
   const signup = async (userData) => {
     try {
       // 1. Prepare the data for the backend
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/serializers/auth_serializers.py]
+      //
       const postData = {
         first_name: userData.firstName,
         last_name: userData.lastName,
@@ -68,13 +68,13 @@ export const AuthProvider = ({ children }) => {
         postData.first_name = userData.hospitalName;
         postData.last_name = ''; // Last name can be blank
         // Map frontend 'hospital' role to backend 'hospital_admin' role
-        // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/models.py]
+        //
         postData.role = 'hospital_admin'; 
         postData.password2 = userData.password;
       }
 
       // 3. Make the API call
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/auth_urls.py]
+      //
       await axios.post("/api/register/", postData);
 
       // 4. On success, return success.
@@ -110,14 +110,14 @@ export const AuthProvider = ({ children }) => {
     try {
       // 1. Prepare data for the backend.
       // The backend expects 'username', but we set username to be email upon creation.
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/serializers/auth_serializers.py]
+      //
       const postData = {
         username: credentials.email,
         password: credentials.password
       };
 
       // 2. Make the API call
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/auth_urls.py]
+      //
       const response = await axios.post('/api/login/', postData);
       
       const { access, refresh } = response.data;
@@ -158,7 +158,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     signup,
-    fetchUser: decodeAndSetUser // Expose this function
+    fetchUser: decodeAndSetUser, // Expose this function
+    setUser // 7. Expose setUser
   }
 
   return (

@@ -1,63 +1,276 @@
 import React, { useState, useEffect } from 'react'
-import { FileText, Plus, Edit, Trash2, Eye, Calendar, User } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
+import { 
+  FileText, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Eye, 
+  Calendar, 
+  User, 
+  Heart, 
+  MessageCircle, 
+  Share2, 
+  Search, 
+  Filter,
+  BookOpen,
+  TrendingUp,
+  Award,
+  Clock,
+  Tag
+} from 'lucide-react'
+import axios from 'axios' // 1. IMPORT AXIOS
 
-const DoctorArticles = () => {
+const Articles = () => {
+  const { user } = useAuth() // Get the logged-in user
+  const { theme } = useTheme()
   const [articles, setArticles] = useState([])
+  
+  // 2. "My Articles" logic is removed for now
+  
   const [loading, setLoading] = useState(true)
+  
+  // 3. "activeTab" is removed
+  
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [newArticle, setNewArticle] = useState({
     title: '',
     content: '',
-    category: '',
-    tags: ''
+    category: '', 
+    tags: '',
+    summary: '' 
   })
 
   useEffect(() => {
     fetchArticles()
   }, [])
 
+  // 4. UPDATED to fetch from backend
   const fetchArticles = async () => {
-    setLoading(true)
-    // Get articles from localStorage
-    const storedArticles = JSON.parse(localStorage.getItem('doctorArticles') || '[]')
-    
-    setTimeout(() => {
-      setArticles(storedArticles)
+    try {
+      setLoading(true)
+      const token = localStorage.getItem('accessToken') // Needed for auth, even for GET
+      
+      //
+      const response = await axios.get('/api/articles/', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      setArticles(response.data)
+      
+    } catch (error) {
+      console.error('Error fetching articles:', error)
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
+  const categories = [
+    { id: 'all', label: 'All Categories', icon: BookOpen },
+    { id: 'cardiology', label: 'Cardiology', icon: Heart },
+    { id: 'psychology', label: 'Mental Health', icon: User },
+    { id: 'endocrinology', label: 'Endocrinology', icon: FileText },
+    { id: 'patient-stories', label: 'Patient Stories', icon: MessageCircle },
+    { id: 'technology', label: 'Healthcare Tech', icon: TrendingUp },
+    { id: 'general', label: 'General Medicine', icon: Award }
+  ]
+
+  // 6. UPDATED to POST to the backend
   const handleCreateArticle = async (e) => {
     e.preventDefault()
-    
-    // Save to localStorage
-    const storedArticles = JSON.parse(localStorage.getItem('doctorArticles') || '[]')
-    const newArticleWithId = {
-      ...newArticle,
-      id: Date.now(),
-      author: 'Dr. Sarah Johnson',
-      date: new Date().toISOString().split('T')[0],
-      views: 0
+    try {
+      const token = localStorage.getItem('accessToken')
+      
+      // Prepare the data. The backend only accepts 'title' and 'content'.
+      //
+      const articleData = {
+        title: newArticle.title,
+        content: newArticle.content
+        // 'author' and 'status' are set automatically by the backend view
+      }
+
+      //
+      await axios.post('/api/articles/', articleData, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      // Reset form, hide it, and refresh the list
+      setNewArticle({ title: '', content: '', category: '', tags: '', summary: '' })
+      setShowCreateForm(false)
+      fetchArticles() // Re-fetch to see the new article
+      alert('Article published successfully!')
+
+    } catch (error) {
+      console.error('Error creating article:', error)
+      alert('Failed to publish article. Please try again.') // This is the alert you saw
     }
-    storedArticles.push(newArticleWithId)
-    localStorage.setItem('doctorArticles', JSON.stringify(storedArticles))
-    
-    setNewArticle({ title: '', content: '', category: '', tags: '' })
-    setShowCreateForm(false)
-    fetchArticles()
   }
 
+  // 7. This function is no longer needed as the backend doesn't have a DELETE endpoint.
   const deleteArticle = async (articleId) => {
-    if (!window.confirm('Are you sure you want to delete this article?')) {
-      return
-    }
-
-    // Delete from localStorage
-    const storedArticles = JSON.parse(localStorage.getItem('doctorArticles') || '[]')
-    const updatedArticles = storedArticles.filter(a => a.id !== articleId)
-    localStorage.setItem('doctorArticles', JSON.stringify(updatedArticles))
-    fetchArticles()
+    alert("Delete functionality is not implemented in the backend yet.")
   }
+
+  const handleLike = (articleId) => {
+    // This is frontend-only for now, as backend doesn't track likes
+    setArticles(articles.map(article => 
+      article.id === articleId 
+        ? { ...article, likes: (article.likes || 0) + 1 }
+        : article
+    ))
+  }
+
+  // 8. Filter logic is simplified
+  const filteredArticles = articles.filter(article => {
+    // We can only filter by title and content
+    const matchesSearch = article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         article.content.toLowerCase().includes(searchQuery.toLowerCase())
+                        
+    return matchesSearch
+  })
+
+  // 9. displayArticles is simplified
+  const displayArticles = filteredArticles
+
+  // 10. UPDATED to use backend data structure
+  const renderArticleCard = (article, isMyArticle = false) => (
+    <div 
+      key={article.id}
+      className="card"
+      style={{ 
+        marginBottom: '1.5rem',
+        border: `1px solid ${theme.border || '#e5e7eb'}`,
+        position: 'relative'
+      }}
+    >
+      <div style={{ padding: '1.5rem' }}>
+        {/* Author Info */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: '#3b82f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 'bold',
+            fontSize: '1rem',
+            color: 'white'
+          }}>
+            {/* 11. Use backend serializer structure */}
+            {article.author.user?.first_name?.charAt(0) || 'D'}
+          </div>
+          <div>
+            <h4 style={{ 
+              margin: 0, 
+              fontSize: '0.95rem', 
+              fontWeight: '500',
+              color: theme.text || '#1e293b'
+            }}>
+              {article.author.user?.first_name} {article.author.user?.last_name}
+            </h4>
+            <p style={{ 
+              margin: 0, 
+              fontSize: '0.8rem', 
+              color: theme.textSecondary || '#64748b'
+            }}>
+              {/* 12. Use backend serializer structure */}
+              Dr. • {article.author.specialization}
+            </p>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: theme.textSecondary || '#64748b', fontSize: '0.8rem' }}>
+              <Calendar size={12} />
+              {new Date(article.created_at).toLocaleDateString()}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: theme.textSecondary || '#64748b', fontSize: '0.8rem' }}>
+              <Clock size={12} />
+              {/* 13. Calculate reading time (mock) */}
+              {Math.ceil(article.content.length / 1000)} min read
+            </div>
+          </div>
+        </div>
+
+        {/* Article Content */}
+        <div style={{ marginBottom: '1rem' }}>
+          <h3 style={{ 
+            color: theme.text || '#1e293b', 
+            marginBottom: '0.5rem', 
+            fontSize: '1.3rem',
+            fontWeight: '600'
+          }}>
+            {article.title}
+          </h3>
+          
+          <p style={{ 
+            color: theme.textSecondary || '#64748b', 
+            marginBottom: '1rem',
+            lineHeight: '1.6',
+            fontSize: '0.95rem'
+          }}>
+            {/* 14. Use content for summary */}
+            {`${article.content.substring(0, 150)}...`}
+          </p>
+        </div>
+
+        {/* Article Stats and Actions */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingTop: '1rem',
+          borderTop: `1px solid ${theme.border || '#e5e7eb'}`
+        }}>
+          <div style={{ display: 'flex', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: theme.textSecondary || '#64748b', fontSize: '0.9rem' }}>
+              <Eye size={14} />
+              {article.views || 0} {/* Mock */}
+            </div>
+            <button
+              onClick={() => handleLike(article.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                background: 'none',
+                border: 'none',
+                color: theme.textSecondary || '#64748b',
+                fontSize: '0.9rem',
+                cursor: 'pointer'
+              }}
+            >
+              <Heart size={14} />
+              {article.likes || 0} {/* Mock */}
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: theme.textSecondary || '#64748b', fontSize: '0.9rem' }}>
+              <MessageCircle size={14} />
+              {article.comments || 0} {/* Mock */}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              className="btn btn-primary" 
+              style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+            >
+              <BookOpen size={14} style={{ marginRight: '0.25rem' }} />
+              Read More
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+            >
+              <Share2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   if (loading) {
     return (
@@ -74,7 +287,7 @@ const DoctorArticles = () => {
 
   return (
     <div>
-      {/* Header with Create Button */}
+      {/* Header */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -82,54 +295,95 @@ const DoctorArticles = () => {
         marginBottom: '2rem'
       }}>
         <div>
-          <h2 style={{ color: '#1e293b', margin: '0 0 0.5rem 0' }}>Medical Articles</h2>
-          <p style={{ color: '#64748b', margin: 0 }}>Share knowledge and insights with the medical community</p>
+          <h2 style={{ color: theme.text || '#1e293b', margin: '0 0 0.5rem 0' }}>
+            Medical Articles & Knowledge Hub
+          </h2>
+          <p style={{ color: theme.textSecondary || '#64748b', margin: 0 }}>
+            Discover insights from healthcare professionals
+          </p>
         </div>
-        <button 
-          onClick={() => setShowCreateForm(true)}
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-        >
-          <Plus size={16} />
-          Create Article
-        </button>
+        {/* 17. Only show "Write Article" button if user is a doctor */}
+        {user && user.role === 'doctor' && (
+          <button 
+            onClick={() => setShowCreateForm(true)}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <Plus size={16} />
+            Write Article
+          </button>
+        )}
+      </div>
+      
+      {/* Filters and Search */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '1rem', 
+        marginBottom: '2rem',
+        flexWrap: 'wrap',
+        alignItems: 'center'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '300px' }}>
+          <Search size={16} style={{ color: theme.textSecondary || '#64748b' }} />
+          <input
+            type="text"
+            placeholder="Search articles by title or content..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              flex: 1,
+              padding: '0.5rem',
+              border: `1px solid ${theme.border || '#e5e7eb'}`,
+              borderRadius: '0.5rem',
+              fontSize: '0.9rem'
+            }}
+          />
+        </div>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Filter size={16} style={{ color: theme.textSecondary || '#64748b' }} />
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              border: `1px solid ${theme.border || '#e5e7eb'}`,
+              borderRadius: '0.5rem',
+              fontSize: '0.9rem',
+              minWidth: '150px'
+            }}
+            disabled={true} // Disable as it's not in the backend model
+          >
+            <option value="all">All Categories (Not Implemented)</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.id}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Create Article Form */}
       {showCreateForm && (
-        <div className="card mb-6">
-          <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Create New Article</h3>
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <h3 style={{ marginBottom: '1.5rem', color: theme.text || '#1e293b' }}>
+            Share Your Knowledge
+          </h3>
           <form onSubmit={handleCreateArticle}>
-            <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">Title</label>
-                <input
-                  type="text"
-                  value={newArticle.title}
-                  onChange={(e) => setNewArticle({...newArticle, title: e.target.value})}
-                  className="form-input"
-                  placeholder="Article title"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <select
-                  value={newArticle.category}
-                  onChange={(e) => setNewArticle({...newArticle, category: e.target.value})}
-                  className="form-input"
-                  required
-                >
-                  <option value="">Select category</option>
-                  <option value="cardiology">Cardiology</option>
-                  <option value="neurology">Neurology</option>
-                  <option value="pediatrics">Pediatrics</option>
-                  <option value="general">General Medicine</option>
-                  <option value="research">Research</option>
-                </select>
-              </div>
+            <div className="form-group">
+              <label className="form-label">Article Title</label>
+              <input
+                type="text"
+                value={newArticle.title}
+                onChange={(e) => setNewArticle({...newArticle, title: e.target.value})}
+                className="form-input"
+                placeholder="Enter a compelling title"
+                required
+              />
             </div>
+
+            {/* 20. REMOVED Category, Summary, and Tags fields from form */}
 
             <div className="form-group">
               <label className="form-label">Content</label>
@@ -138,19 +392,8 @@ const DoctorArticles = () => {
                 onChange={(e) => setNewArticle({...newArticle, content: e.target.value})}
                 className="form-input"
                 placeholder="Write your article content here..."
-                rows="8"
+                rows="10"
                 required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Tags (comma separated)</label>
-              <input
-                type="text"
-                value={newArticle.tags}
-                onChange={(e) => setNewArticle({...newArticle, tags: e.target.value})}
-                className="form-input"
-                placeholder="e.g., heart disease, prevention, treatment"
               />
             </div>
 
@@ -171,133 +414,30 @@ const DoctorArticles = () => {
       )}
 
       {/* Articles List */}
-      <div className="card">
-        <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>
-          My Articles ({articles.length})
-        </h3>
-
-        {articles.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {articles.map((article) => (
-              <div 
-                key={article.id}
-                style={{ 
-                  padding: '1.5rem', 
-                  border: '1px solid #e5e7eb', 
-                  borderRadius: '0.75rem',
-                  backgroundColor: '#fafafa'
-                }}
-              >
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'flex-start',
-                  marginBottom: '1rem'
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ color: '#1e293b', marginBottom: '0.5rem', fontSize: '1.2rem' }}>
-                      {article.title}
-                    </h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                      <span style={{ 
-                        padding: '0.25rem 0.75rem',
-                        backgroundColor: '#3b82f6',
-                        color: 'white',
-                        borderRadius: '0.25rem',
-                        fontSize: '0.8rem',
-                        textTransform: 'capitalize'
-                      }}>
-                        {article.category}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#64748b', fontSize: '0.9rem' }}>
-                        <Calendar size={14} />
-                        {new Date(article.created_at).toLocaleDateString()}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#64748b', fontSize: '0.9rem' }}>
-                        <Eye size={14} />
-                        {article.views || 0} views
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '0.5rem' }}>
-                      <Edit size={14} />
-                    </button>
-                    <button 
-                      onClick={() => deleteArticle(article.id)}
-                      className="btn btn-secondary" 
-                      style={{ 
-                        fontSize: '0.9rem', 
-                        padding: '0.5rem',
-                        backgroundColor: '#ef4444'
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                <p style={{ 
-                  color: '#64748b', 
-                  marginBottom: '1rem',
-                  lineHeight: '1.6'
-                }}>
-                  {article.content.substring(0, 200)}...
-                </p>
-
-                {article.tags && (
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    {article.tags.split(',').map((tag, index) => (
-                      <span 
-                        key={index}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          backgroundColor: '#e5e7eb',
-                          color: '#64748b',
-                          borderRadius: '0.25rem',
-                          fontSize: '0.8rem'
-                        }}
-                      >
-                        #{tag.trim()}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '0.5rem',
-                  paddingTop: '1rem',
-                  borderTop: '1px solid #e5e7eb'
-                }}>
-                  <button className="btn btn-primary" style={{ fontSize: '0.9rem' }}>
-                    <Eye size={14} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                    View Full Article
-                  </button>
-                  <button className="btn btn-secondary" style={{ fontSize: '0.9rem' }}>
-                    Share
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div>
+        {displayArticles.length > 0 ? (
+          displayArticles.map((article) => renderArticleCard(article, false))
         ) : (
-          <div style={{ textAlign: 'center', padding: '3rem' }}>
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <FileText size={48} style={{ color: '#d1d5db', margin: '0 auto 1rem' }} />
-            <p style={{ color: '#64748b', fontSize: '1.1rem' }}>
-              No articles published yet
+            <h3 style={{ color: theme.text || '#1e293b', marginBottom: '1rem' }}>
+              No articles found
+            </h3>
+            <p style={{ color: theme.textSecondary || '#64748b', fontSize: '1rem' }}>
+              {user.role === 'doctor' 
+                ? 'Be the first to share your knowledge!'
+                : 'Check back later for new articles from our doctors.'
+              }
             </p>
-            <p style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-              Share your medical knowledge by creating your first article
-            </p>
-            <button 
-              onClick={() => setShowCreateForm(true)}
-              className="btn btn-primary"
-              style={{ marginTop: '1rem' }}
-            >
-              Create Your First Article
-            </button>
+            {user.role === 'doctor' && (
+              <button 
+                onClick={() => setShowCreateForm(true)}
+                className="btn btn-primary"
+                style={{ marginTop: '1rem' }}
+              >
+                Write Your First Article
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -305,4 +445,4 @@ const DoctorArticles = () => {
   )
 }
 
-export default DoctorArticles
+export default Articles

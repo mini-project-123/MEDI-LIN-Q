@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Calendar, Clock, Filter, Search, User, Phone } from 'lucide-react'
+import axios from 'axios' // 1. IMPORT AXIOS
 
 const DoctorAppointments = () => {
-  const [appointments, setAppointments] = useState([])
-  const [filteredAppointments, setFilteredAppointments] = useState([])
+  // 2. We only need one state for appointments now
+  const [appointments, setAppointments] = useState([]) 
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     status: '',
@@ -12,77 +13,56 @@ const DoctorAppointments = () => {
     timeEnd: ''
   })
 
+  // 3. This useEffect now re-fetches data ANYTIME the filters change
   useEffect(() => {
     fetchAppointments()
-  }, [])
+  }, [filters]) // Dependency array changed to [filters]
 
-  useEffect(() => {
-    applyFilters()
-  }, [filters, appointments])
-
+  // 4. This function is now rewritten for API calls
   const fetchAppointments = async () => {
     setLoading(true)
-    // Mock appointment data
-    const mockAppointments = [
-      {
-        id: 1,
-        patient: { user: { first_name: 'John', last_name: 'Doe' }, phone: '+1234567890' },
-        appointment_datetime: new Date().toISOString(),
-        status: 'confirmed',
-        token_number: 'T001',
-        reason: 'Regular checkup'
-      },
-      {
-        id: 2,
-        patient: { user: { first_name: 'Jane', last_name: 'Smith' }, phone: '+1234567891' },
-        appointment_datetime: new Date(Date.now() + 86400000).toISOString(),
-        status: 'confirmed',
-        token_number: 'T002',
-        reason: 'Follow-up consultation'
-      },
-      {
-        id: 3,
-        patient: { user: { first_name: 'Robert', last_name: 'Johnson' }, phone: '+1234567892' },
-        appointment_datetime: new Date(Date.now() - 86400000).toISOString(),
-        status: 'completed',
-        token_number: 'T003',
-        reason: 'Lab results review'
+    try {
+      // Get the auth token
+      const token = localStorage.getItem('accessToken');
+      
+      // Prepare the query parameters from the filter state
+      const params = new URLSearchParams()
+      if (filters.status) {
+        params.append('status', filters.status)
       }
-    ]
-    
-    setTimeout(() => {
-      setAppointments(mockAppointments)
-      setFilteredAppointments(mockAppointments)
-      setLoading(false)
-    }, 500)
-  }
+      if (filters.date) {
+        params.append('date', filters.date)
+      }
+      if (filters.timeStart) {
+        // Backend expects HH:MM format
+        params.append('time_start', filters.timeStart)
+      }
+      if (filters.timeEnd) {
+        // Backend expects HH:MM format
+        params.append('time_end', filters.timeEnd)
+      }
 
-  const applyFilters = () => {
-    let filtered = [...appointments]
-
-    // Status filter
-    if (filters.status) {
-      filtered = filtered.filter(apt => apt.status === filters.status)
-    }
-
-    // Date filter
-    if (filters.date) {
-      filtered = filtered.filter(apt => 
-        new Date(apt.appointment_datetime).toDateString() === 
-        new Date(filters.date).toDateString()
-      )
-    }
-
-    // Time range filter
-    if (filters.timeStart && filters.timeEnd) {
-      filtered = filtered.filter(apt => {
-        const aptTime = new Date(apt.appointment_datetime).toTimeString().slice(0, 5)
-        return aptTime >= filters.timeStart && aptTime <= filters.timeEnd
+      // Make the API call
+      //
+      const response = await axios.get('/api/doctor/appointments/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        params: params // Pass the filters as query parameters
       })
-    }
+      
+      // 5. Set the response data (which is already filtered by the backend)
+      setAppointments(response.data)
 
-    setFilteredAppointments(filtered)
+    } catch (error) {
+      console.error('Error fetching appointments:', error)
+      // You could add error handling here, e.g., redirect on 401/403
+    } finally {
+      setLoading(false)
+    }
   }
+
+  // 6. applyFilters() function is no longer needed, so it's been removed.
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({
@@ -134,6 +114,7 @@ const DoctorAppointments = () => {
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
 
@@ -183,13 +164,16 @@ const DoctorAppointments = () => {
         marginBottom: '1.5rem'
       }}>
         <h3 style={{ color: '#1e293b' }}>
-          Appointments ({filteredAppointments.length})
+          {/* 7. Use appointments.length */}
+          Appointments ({appointments.length}) 
         </h3>
       </div>
 
-      {filteredAppointments.length > 0 ? (
+      {/* 8. Check appointments.length */}
+      {appointments.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {filteredAppointments.map((appointment) => (
+          {/* 9. Map over appointments */}
+          {appointments.map((appointment) => (
             <div 
               key={appointment.id}
               style={{ 
@@ -218,6 +202,7 @@ const DoctorAppointments = () => {
                       color: 'white',
                       fontWeight: 'bold'
                     }}>
+                      {/* 10. Use backend serializer structure */}
                       {appointment.patient?.user?.first_name?.charAt(0)}
                       {appointment.patient?.user?.last_name?.charAt(0)}
                     </div>

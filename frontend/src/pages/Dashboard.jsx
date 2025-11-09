@@ -6,16 +6,17 @@ import { Calendar, Users, Clock, User, Settings, Activity, Pill, FileText, Sun, 
 import DoctorDashboard from '../components/DoctorDashboard'
 import DoctorAppointments from '../components/DoctorAppointments'
 import DoctorPatients from '../components/DoctorPatients'
-import DoctorProfile from '../components/DoctorProfile'
+import DoctorProfile from '../components/DoctorProfile' // 1. This is for the "Profile" tab
 import DoctorPrescriptions from '../components/DoctorPrescriptions'
-import DoctorSettings from '../components/DoctorSettings'
+import DoctorSettings from '../components/DoctorSettings' // 2. This is for the "Settings" tab
 import Articles from '../components/Articles'
 import PatientDashboard from '../components/PatientDashboard'
 import PatientAppointments from '../components/PatientAppointments'
 import PatientPrescriptions from '../components/PatientPrescriptions'
 import PatientReports from '../components/PatientReports'
 import PatientSettings from '../components/PatientSettings'
-import UserProfile from '../components/UserProfile'
+// 3. We keep UserProfile because the Patient dashboard might use it.
+import UserProfile from '../components/UserProfile' 
 import HospitalDashboard from '../components/HospitalDashboard'
 import HospitalPatients from '../components/HospitalPatients'
 import HospitalDoctors from '../components/HospitalDoctors'
@@ -37,16 +38,26 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview')
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
+  // This effect hook correctly handles the profile completion redirect
   useEffect(() => {
-    if (user?.role !== 'doctor') {
-      fetchDashboardData()
-    } else {
-      setLoading(false)
+    if (user && !user.profile_complete) {
+      if (user.role === 'patient') {
+        navigate('/complete-profile');
+      } else if (user.role === 'doctor') {
+        navigate('/complete-doctor-profile');
+      }
+    } 
+    else if (user && user.profile_complete) {
+      if (user.role !== 'doctor') { 
+        fetchDashboardData()
+      } else {
+        setLoading(false) 
+      }
     }
-  }, [user])
+  }, [user, navigate]) 
 
   const fetchDashboardData = async () => {
-    // Mock data from localStorage
+    setLoading(true)
     const mockAppointments = JSON.parse(localStorage.getItem('appointments') || '[]')
     const mockStats = {
       totalAppointments: mockAppointments.length,
@@ -67,9 +78,10 @@ const Dashboard = () => {
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: '2rem',
-        borderBottom: `1px solid ${theme.border}`
+        borderBottom: `1px solid ${theme.border}`,
+        flexWrap: 'wrap' // Allow tabs to wrap on small screens
       }}>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           {[
             { id: 'overview', label: 'Health Analytics', icon: Activity },
             { id: 'appointments', label: 'Appointments', icon: Calendar },
@@ -394,31 +406,16 @@ const Dashboard = () => {
         {activeTab === 'patients' && <DoctorPatients />}
         {activeTab === 'articles' && <Articles />}
         {activeTab === 'prescriptions' && <DoctorPrescriptions />}
+        
+        {/* 4. POINT "SETTINGS" TAB TO DoctorSettings */}
         {activeTab === 'settings' && <DoctorSettings />}
-        {activeTab === 'profile' && <UserProfile />}
+        
+        {/* 5. POINT "PROFILE" TAB TO DoctorProfile */}
+        {activeTab === 'profile' && <DoctorProfile />}
       </div>
     </div>
   )
-
-
-
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '50vh' 
-      }}>
-        <div>Loading dashboard...</div>
-      </div>
-    )
-  }
-
-  if (user.role === 'doctor') {
-    return renderDoctorDashboard()
-  }
-
+  
   const renderHospitalDashboard = () => (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       {/* Sidebar */}
@@ -616,7 +613,28 @@ const Dashboard = () => {
     </div>
   )
 
-  if (user.role === 'hospital') {
+  // This check is CRITICAL. It ensures that if the profile is not
+  // complete, it shows a loading screen while the redirect happens.
+  if (!user || (!user.profile_complete && loading)) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '50vh' 
+      }}>
+        <div>Loading dashboard...</div>
+      </div>
+    )
+  }
+
+  if (user.role === 'doctor') {
+    return renderDoctorDashboard()
+  }
+
+  // NOTE: Your 'user.role' from the backend is 'hospital_admin', not 'hospital'
+  // I am changing this to 'hospital_admin' to match your backend.
+  if (user.role === 'hospital_admin') {
     return renderHospitalDashboard()
   }
 

@@ -22,7 +22,8 @@ export const CompleteDoctorProfile = () => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    // 3. Automatically set the hospital ID from the user's state
+    // 3. Automatically set the hospital ID if it was provided during signup
+    // (Note: Your signup logic doesn't seem to pass this, but this is good practice)
     if (user && user.hospitalId) {
       setFormData(prev => ({ ...prev, hospital: user.hospitalId }))
     }
@@ -30,6 +31,7 @@ export const CompleteDoctorProfile = () => {
     const fetchHospitals = async () => {
       try {
         const token = localStorage.getItem('accessToken')
+        //
         const response = await axios.get('/api/booking/hospitals/', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -80,7 +82,7 @@ export const CompleteDoctorProfile = () => {
 
     try {
       // 5. Send the data to the correct backend endpoint
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/doctor_urls.py]
+      //
       await axios.post('/api/profile/doctor/', profileData, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -88,14 +90,14 @@ export const CompleteDoctorProfile = () => {
         }
       })
       
-      // 6. On success, remove the temp hospitalId and go to dashboard
-      localStorage.removeItem('tempDoctorHospitalId')
+      // 6. On success, remove any temporary flags if you had them
+      // localStorage.removeItem('tempDoctorHospitalId') // (You don't seem to use this, which is fine)
       alert('Profile completed successfully! Welcome, Doctor.')
       
       // 7. Manually update AuthContext user to set profile_complete to true
-      // This is a workaround so the dashboard doesn't redirect
+      // This is critical so the dashboard doesn't redirect again
       const updatedUser = { ...user, profile_complete: true };
-      setUser(updatedUser); // This function needs to be exposed from AuthContext
+      setUser(updatedUser); // This function was exposed from AuthContext
       
       navigate('/dashboard')
 
@@ -188,7 +190,7 @@ export const CompleteDoctorProfile = () => {
             </label>
             <select
               name="hospital"
-              value={formData.hospital} // 8. Value is now pre-filled from state
+              value={formData.hospital} // 8. Value will be '' or the pre-filled ID
               onChange={handleChange}
               className="form-input"
               required
@@ -198,11 +200,11 @@ export const CompleteDoctorProfile = () => {
               {hospitals.map(hospital => (
                 // 10. Use hospital.id as the value
                 <option key={hospital.id} value={hospital.id}>
-                  {hospital.name} - {hospital.custom_id}
+                  {hospital.name} {hospital.custom_id ? `(${hospital.custom_id})` : ''}
                 </option>
               ))}
             </select>
-            {/* 11. Show the dropdown even if pre-selected, but disable it */}
+            {/* 11. Show a helper message if the hospital was set at signup */}
             {user && user.hospitalId && (
               <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.5rem' }}>
                 Your hospital was set during signup.

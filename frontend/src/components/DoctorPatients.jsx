@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Search, Filter, User, Calendar, Phone, Mail, Eye, FileText } from 'lucide-react'
+import axios from 'axios' // 1. IMPORT AXIOS
 
 const DoctorPatients = () => {
   const [patients, setPatients] = useState([])
+  // 2. RENAMED to reflect it's from the API
   const [filteredPatients, setFilteredPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedPatient, setSelectedPatient] = useState(null)
@@ -11,110 +13,78 @@ const DoctorPatients = () => {
   const [showPatientModal, setShowPatientModal] = useState(false)
   const [filters, setFilters] = useState({
     search: '',
-    visited: '',
-    consultationType: ''
+    visited: '', // 'today', 'yesterday', 'this_month'
+    consultationType: '' // Note: Your backend doesn't filter by this, but we'll leave the UI
   })
 
+  // 3. This useEffect now fetches when filters change
   useEffect(() => {
     fetchPatients()
-  }, [])
+  }, [filters]) // Re-fetch when filters change
 
-  useEffect(() => {
-    applyFilters()
-  }, [filters, patients])
-
+  // 4. fetchPatients is now connected to the backend
   const fetchPatients = async () => {
     setLoading(true)
-    // Mock patient data
-    const mockPatients = [
-      {
-        id: 1,
-        user: { first_name: 'John', last_name: 'Doe', email: 'john@example.com' },
-        phone: '+1234567890',
-        date_of_birth: '1980-01-15',
-        blood_group: 'O+',
-        last_visit: new Date().toISOString().split('T')[0],
-        consultation_type: 'In-Person'
-      },
-      {
-        id: 2,
-        user: { first_name: 'Jane', last_name: 'Smith', email: 'jane@example.com' },
-        phone: '+1234567891',
-        date_of_birth: '1992-05-20',
-        blood_group: 'A+',
-        last_visit: new Date().toISOString().split('T')[0],
-        consultation_type: 'Video Call'
+    try {
+      const token = localStorage.getItem('accessToken')
+      
+      // Prepare query params
+      const params = new URLSearchParams()
+      if (filters.search) {
+        params.append('search', filters.search)
       }
-    ]
-    setTimeout(() => {
-      setPatients(mockPatients)
-      setFilteredPatients(mockPatients)
-      setLoading(false)
-    }, 500)
-  }
-
-  const fetchPatientDetails = async (patientId) => {
-    const patient = patients.find(p => p.id === patientId)
-    if (patient) {
-      setPatientDetails(patient)
-    }
-  }
-
-  const fetchPatientSummary = async (patientId) => {
-    // Mock AI summary
-    setPatientSummary('Patient has been under regular care with stable vitals. Recent checkup shows improvement in overall health. Continue current medication and schedule follow-up in 2 weeks.')
-  }
-
-  const applyFilters = () => {
-    let filtered = [...patients]
-
-    // Search filter
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase()
-      filtered = filtered.filter(patient => 
-        patient.user?.first_name?.toLowerCase().includes(searchTerm) ||
-        patient.user?.last_name?.toLowerCase().includes(searchTerm) ||
-        patient.user?.custom_id?.toLowerCase().includes(searchTerm)
-      )
-    }
-
-    // Visit filter
-    if (filters.visited) {
-      const today = new Date()
-      const todayStr = today.toDateString()
-      const yesterday = new Date(today)
-      yesterday.setDate(today.getDate() - 1)
-      const yesterdayStr = yesterday.toDateString()
-
-      filtered = filtered.filter(patient => {
-        if (!patient.last_visit_date) return false
-        
-        const visitDate = new Date(patient.last_visit_date).toDateString()
-        
-        switch (filters.visited) {
-          case 'today':
-            return visitDate === todayStr
-          case 'yesterday':
-            return visitDate === yesterdayStr
-          case 'this_month':
-            const visitMonth = new Date(patient.last_visit_date)
-            return visitMonth.getMonth() === today.getMonth() && 
-                   visitMonth.getFullYear() === today.getFullYear()
-          default:
-            return true
-        }
+      if (filters.visited) {
+        params.append('visited', filters.visited)
+      }
+      
+      //
+      const response = await axios.get('/api/doctor/patients/', {
+        headers: { 'Authorization': `Bearer ${token}` },
+        params: params
       })
+      
+      setPatients(response.data)
+      setFilteredPatients(response.data) // Set both for consistency
+    } catch (error) {
+      console.error('Error fetching patients:', error)
+      setPatients([]) // Clear list on error
+      setFilteredPatients([])
+    } finally {
+      setLoading(false)
     }
-
-    // Consultation type filter
-    if (filters.consultationType) {
-      filtered = filtered.filter(patient => 
-        patient.consultation_type === filters.consultationType
-      )
-    }
-
-    setFilteredPatients(filtered)
   }
+
+  // 5. This new function fetches full details for the modal
+  //
+  const fetchPatientDetails = async (patientId) => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      const response = await axios.get(`/api/doctor/patients/${patientId}/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      setPatientDetails(response.data)
+    } catch (error) {
+      console.error('Error fetching patient details:', error)
+      setPatientDetails(null) // Reset on error
+    }
+  }
+
+  // 6. This new function fetches the AI summary for the modal
+  //
+  const fetchPatientSummary = async (patientId) => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      const response = await axios.get(`/api/patients/${patientId}/summary/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      setPatientSummary(response.data.summary)
+    } catch (error) {
+      console.error('Error fetching patient summary:', error)
+      setPatientSummary('Error: Could not load AI summary.')
+    }
+  }
+
+  // 7. applyFilters is no longer needed (removed)
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({
@@ -131,15 +101,21 @@ const DoctorPatients = () => {
     })
   }
 
+  // 8. openPatientModal is now async and calls the new fetch functions
   const openPatientModal = async (patient) => {
-    setSelectedPatient(patient)
+    setSelectedPatient(patient) // Set the basic patient data (from list) immediately
     setShowPatientModal(true)
-    setPatientDetails(null)
-    setPatientSummary('')
+    setPatientDetails(null) // Clear old details
+    setPatientSummary('')   // Clear old summary
     
-    // Fetch detailed patient information
-    await fetchPatientDetails(patient.id)
-    await fetchPatientSummary(patient.id)
+    // Get the patient's User ID from the nested structure
+    const patientId = patient.user.id; 
+    
+    // Fetch detailed patient information and summary in parallel
+    await Promise.all([
+      fetchPatientDetails(patientId),
+      fetchPatientSummary(patientId)
+    ])
   }
 
   const closePatientModal = () => {
@@ -171,6 +147,7 @@ const DoctorPatients = () => {
               type="text"
               placeholder="Name or ID..."
               value={filters.search}
+              // 9. Use handleFilterChange to update state, which triggers fetch
               onChange={(e) => handleFilterChange('search', e.target.value)}
               className="form-input"
               style={{ paddingLeft: '2.5rem' }}
@@ -198,13 +175,12 @@ const DoctorPatients = () => {
             value={filters.consultationType}
             onChange={(e) => handleFilterChange('consultationType', e.target.value)}
             className="form-input"
+            // 10. This filter is not in the backend view, so we'll disable it for now
+            disabled={true} 
           >
-            <option value="">All Types</option>
+            <option value="">All Types (Not Implemented)</option>
             <option value="general">General Checkup</option>
             <option value="follow_up">Follow-up</option>
-            <option value="emergency">Emergency</option>
-            <option value="consultation">Consultation</option>
-            <option value="routine">Routine Visit</option>
           </select>
         </div>
       </div>
@@ -232,7 +208,7 @@ const DoctorPatients = () => {
         <div className="grid grid-2" style={{ gap: '1rem' }}>
           {filteredPatients.map((patient) => (
             <div 
-              key={patient.id}
+              key={patient.user.id} // Use patient.user.id as the key
               style={{ 
                 padding: '1.5rem', 
                 border: '1px solid #e5e7eb', 
@@ -241,7 +217,7 @@ const DoctorPatients = () => {
                 cursor: 'pointer',
                 transition: 'all 0.2s'
               }}
-              onClick={() => openPatientModal(patient)}
+              onClick={() => openPatientModal(patient)} // Pass the whole patient object
               onMouseEnter={(e) => {
                 e.target.style.borderColor = '#3b82f6'
                 e.target.style.backgroundColor = '#f8fafc'
@@ -276,33 +252,9 @@ const DoctorPatients = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <User size={14} style={{ color: '#64748b' }} />
-                  <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                    Age: {patient.user?.age || 'N/A'} • {patient.user?.gender || 'N/A'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Calendar size={14} style={{ color: '#64748b' }} />
-                  <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                    Last visit: {patient.last_visit_date ? 
-                      new Date(patient.last_visit_date).toLocaleDateString() : 
-                      'No visits'
-                    }
-                  </span>
-                </div>
-
-                {patient.total_appointments && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FileText size={14} style={{ color: '#64748b' }} />
-                    <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                      {patient.total_appointments} appointments
-                    </span>
-                  </div>
-                )}
-              </div>
+              {/* 11. Removed Age, Gender, Last Visit, and Appointments count
+                   from this list view, as they don't come from the
+                   PatientListSerializer. They WILL appear in the modal. */}
 
               <div style={{ 
                 marginTop: '1rem', 
@@ -373,6 +325,7 @@ const DoctorPatients = () => {
             </button>
           </div>
 
+          {/* 12. Use patientDetails (from API) not selectedPatient (from list) */}
           {patientDetails ? (
             <div>
               {/* Patient Basic Info */}
@@ -381,13 +334,13 @@ const DoctorPatients = () => {
                 <div className="grid grid-2" style={{ gap: '1rem' }}>
                   <div>
                     <p><strong>ID:</strong> {patientDetails.user?.custom_id}</p>
-                    <p><strong>Age:</strong> {patientDetails.user?.age}</p>
+                    <p><strong>Age:</strong> {patientDetails.age}</p>
                     <p><strong>Gender:</strong> {patientDetails.user?.gender}</p>
                   </div>
                   <div>
                     <p><strong>Email:</strong> {patientDetails.user?.email}</p>
-                    <p><strong>Phone:</strong> {patientDetails.user?.phone_number}</p>
-                    <p><strong>Emergency Contact:</strong> {patientDetails.emergency_contact_name}</p>
+                    <p><strong>Phone:</strong> {patientDetails.user?.contact_no}</p>
+                    <p><strong>Emergency Contact:</strong> {patientDetails.emergency_contact_relation}</p>
                   </div>
                 </div>
                 {patientDetails.allergies && (
@@ -399,7 +352,8 @@ const DoctorPatients = () => {
               </div>
 
               {/* AI Summary */}
-              {patientSummary && (
+              {/* 13. Use patientSummary state, which is loading in parallel */}
+              {patientSummary ? (
                 <div className="card mb-4">
                   <h4 style={{ marginBottom: '1rem', color: '#1e293b' }}>AI Medical Summary</h4>
                   <div 
@@ -411,9 +365,16 @@ const DoctorPatients = () => {
                     dangerouslySetInnerHTML={{ __html: patientSummary.replace(/\n/g, '<br>') }}
                   />
                 </div>
+              ) : (
+                <div className="card mb-4">
+                  <h4 style={{ marginBottom: '1rem', color: '#1e293b' }}>AI Medical Summary</h4>
+                  <p>Loading AI summary...</p>
+                </div>
               )}
 
+
               {/* Recent Appointments */}
+              {/* 14. Use patientDetails.appointments from the backend */}
               {patientDetails.appointments && patientDetails.appointments.length > 0 && (
                 <div className="card mb-4">
                   <h4 style={{ marginBottom: '1rem', color: '#1e293b' }}>Recent Appointments</h4>
@@ -442,6 +403,7 @@ const DoctorPatients = () => {
               )}
 
               {/* Prescriptions */}
+              {/* 15. Use patientDetails.prescriptions from the backend */}
               {patientDetails.prescriptions && patientDetails.prescriptions.length > 0 && (
                 <div className="card">
                   <h4 style={{ marginBottom: '1rem', color: '#1e293b' }}>Recent Prescriptions</h4>
@@ -458,7 +420,7 @@ const DoctorPatients = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                           <strong>{prescription.medication?.name}</strong>
                           <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                            {new Date(prescription.appointment?.appointment_datetime).toLocaleDateString()}
+                            {new Date(prescription.prescription_date).toLocaleDateString()}
                           </span>
                         </div>
                         <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
@@ -485,7 +447,7 @@ const DoctorPatients = () => {
     )
   }
 
-  if (loading) {
+  if (loading && !showPatientModal) { // Don't show full page load if modal is just loading
     return (
       <div style={{ 
         display: 'flex', 

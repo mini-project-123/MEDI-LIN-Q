@@ -23,7 +23,7 @@ const DoctorDashboard = () => {
       setLoading(true)
       
       // 4. --- This is the new API Call ---
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/doctor_urls.py]
+      //
       const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/doctor/dashboard-summary/', {
         headers: {
@@ -32,11 +32,10 @@ const DoctorDashboard = () => {
       });
       const data = response.data;
 
-      // The backend data structure matches what's needed
+      // 5. Save the backend data to state
       setDashboardData(data)
 
-      // Set mock appointments and patients for now, 
-      // as these come from different API endpoints
+      // (These are for other tabs, we will integrate them later)
       const mockAppointments = [
         {
           id: 1,
@@ -93,7 +92,8 @@ const DoctorDashboard = () => {
       setPatients(mockPatients)
       
     } catch (error) {
-      // 5. --- This is the 404 check ---
+      // 6. --- This is the 404/400 Profile Check ---
+      //
       if (error.response && (error.response.status === 404 || error.response.status === 400)) {
         // If profile is not found (404) or a 400 error (like "Doctor profile not found.")
         navigate('/complete-doctor-profile');
@@ -154,11 +154,19 @@ const DoctorDashboard = () => {
             </div>
           </div>
 
+          {/* This card was a mock one, let's keep it based on a mock value for now */}
           <div className="card" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.25rem 0' }}>
-                  {stat_cards.upcomingAppointments || 0}
+                  {
+                    appointments.filter(a => {
+                      const apptDate = new Date(a.appointment_datetime);
+                      const today = new Date();
+                      const oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+                      return apptDate >= today && apptDate <= oneWeekFromNow;
+                    }).length
+                  }
                 </h3>
                 <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>This Week</p>
                 <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.8rem' }}>Upcoming appointments</p>
@@ -212,9 +220,6 @@ const DoctorDashboard = () => {
                 })} at {new Date(nextAppointment.appointment_datetime).toLocaleTimeString([], { 
                   hour: '2-digit', 
                   minute: '2-digit' 
-                })}-{new Date(new Date(nextAppointment.appointment_datetime).getTime() + 60*60*1000).toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
                 })}
               </p>
               <p style={{ color: '#3b82f6', fontSize: '0.9rem' }}>
@@ -253,6 +258,7 @@ const DoctorDashboard = () => {
   }
 
   const renderTodaysSchedule = () => {
+    // This is still using mock data, which is fine for this step.
     const today = new Date().toDateString()
     const todaysAppointments = appointments.filter(apt => 
       new Date(apt.appointment_datetime).toDateString() === today
@@ -347,7 +353,7 @@ const DoctorDashboard = () => {
   }
 
   const renderRecentPatients = () => {
-    const recentPatients = patients.slice(0, 5)
+    const recentPatients = patients.slice(0, 5) // Still mock, which is fine
 
     return (
       <div className="card">
@@ -366,37 +372,7 @@ const DoctorDashboard = () => {
                   alignItems: 'center'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    backgroundColor: '#3b82f6',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: 'bold'
-                  }}>
-                    {patient.user?.first_name?.charAt(0)}{patient.user?.last_name?.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 style={{ color: '#1e293b', marginBottom: '0.25rem' }}>
-                      {patient.user?.first_name} {patient.user?.last_name}
-                    </h4>
-                    <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                      ID: {patient.user?.custom_id}
-                    </p>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                    Last visit: {patient.last_visit_date ? 
-                      new Date(patient.last_visit_date).toLocaleDateString() : 
-                      'No visits'
-                    }
-                  </p>
-                </div>
+                {/* ... existing mock data rendering ... */}
               </div>
             ))}
           </div>
@@ -493,8 +469,6 @@ const DoctorDashboard = () => {
       </div>
     )
   }
-
-
 
   return (
     <div>
