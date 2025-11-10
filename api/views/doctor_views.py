@@ -1,3 +1,4 @@
+# api/views/doctor_views.py
 
 from rest_framework import generics, permissions
 from rest_framework.views import APIView
@@ -9,8 +10,11 @@ import pandas as pd
 from django.conf import settings
 import google.generativeai as genai
 import joblib
+from django.http import Http404 # <-- Make sure this is imported
+
 from api.permissions import IsDoctorUser
 from api.models import Appointment, PatientProfile, User, DoctorProfile, Prescription, Medication 
+# This is the ONLY place this import should be
 from api.serializers.doctor_serializers import DoctorProfileSerializer, NextAppointmentSerializer, DoctorAppointmentSerializer
 from api.serializers.patient_serializers import (
     PatientListSerializer,
@@ -22,12 +26,35 @@ from api.serializers.patient_serializers import (
 class DoctorProfileView(generics.CreateAPIView):
     """
     API view for a logged-in doctor to create their detailed profile.
+    This view now also updates the User model with details from the form.
     """
     serializer_class = DoctorProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
+    # --- OVERRIDE perform_create TO SAVE TO USER MODEL ---
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Get the user object from the request
+        user = self.request.user
+        
+        # Get the validated data from the serializer
+        validated_data = serializer.validated_data
+
+        # --- Pop the user-specific fields ---
+        # We provide a default value (the user's current value)
+        # in case the field wasn't sent in the request.
+        user.gender = validated_data.pop('gender', user.gender)
+        user.contact_no = validated_data.pop('contact_no', user.contact_no)
+        user.date_of_birth = validated_data.pop('date_of_birth', user.date_of_birth)
+        user.address = validated_data.pop('address', user.address)
+        
+        # Save the updated User model
+        user.save()
+        
+        # Save the DoctorProfile model with the remaining data
+        # The 'user' is passed in here, and 'hospital' is already
+        # in validated_data (as an ID) which is correct for the serializer.
+        serializer.save(user=user, **validated_data)
+
 
 # --- Dashboard Summary View ---
 class DoctorDashboardSummaryView(APIView):
@@ -37,7 +64,6 @@ class DoctorDashboardSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
     def get(self, request, *args, **kwargs):
-        # ... (Keep existing dashboard summary logic) ...
         try:
             doctor = request.user.doctorprofile
         except DoctorProfile.DoesNotExist:
@@ -117,7 +143,6 @@ class DoctorPatientListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
     def get_queryset(self):
-        # ... (Keep existing queryset logic with search and filter) ...
         try:
             doctor = self.request.user.doctorprofile
         except DoctorProfile.DoesNotExist:
@@ -375,4 +400,3 @@ class DoctorProfileManageView(generics.RetrieveUpdateDestroyAPIView):
         except DoctorProfile.DoesNotExist:
             # This should ideally not happen if they completed step 2 reg
             raise Http404("Doctor profile has not been created yet.")
-

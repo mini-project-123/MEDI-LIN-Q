@@ -121,17 +121,19 @@ export const AuthProvider = ({ children }) => {
         postData.password2 = userData.password;
       }
 
+      // --- NEW: Handle Doctor Signup ---
+      if (postData.role === 'doctor') {
+        // Store the hospital ID locally to be used on the profile completion page
+        // We use the `hospitalId` from the form's state
+        localStorage.setItem('tempDoctorHospitalId', userData.hospitalId);
+      }
+      // --- END OF NEW ---
+
       // 3. Make the API call to register the user
       await axios.post("/api/register/", postData);
 
-      // 4. Immediately log in the user after successful registration
-      const loginResult = await login(userData); 
-      
-      if (loginResult.success) {
-          return { success: true };
-      } else {
-          return { success: false, error: "Registration succeeded, but automatic login failed. Please try logging in manually." };
-      }
+      // 4. Return success and redirect to login
+      return { success: true };
 
     } catch (error) {
       // 5. Handle errors from the backend
@@ -163,6 +165,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('user') // Also remove any mock user data
+    localStorage.removeItem('tempDoctorHospitalId') // --- ENSURE TEMP ID IS CLEARED ---
     delete axios.defaults.headers.common['Authorization'] // Remove default header
   }
 
@@ -192,77 +195,3 @@ export const useAuth = () => {
   }
   return context
 }
-
-
-
-
-// import React, { createContext, useState, useContext, useEffect } from 'react'
-// import axios from 'axios'
-// import { jwtDecode } from 'jwt-decode' 
-
-// const AuthContext = createContext()
-
-// export const useAuth = () => {
-//   return useContext(AuthContext)
-// }
-
-// export const AuthProvider = ({ children }) => {
-//   // Renamed to setUserState to avoid conflicts
-//   const [user, setUserState] = useState(() => {
-//     const storedUser = localStorage.getItem('user')
-//     return storedUser ? JSON.parse(storedUser) : null
-//   })
-
-//   useEffect(() => {
-//     const token = localStorage.getItem('accessToken')
-//     if (token) {
-//       try {
-//         const decoded = jwtDecode(token)
-//         if (decoded.exp * 1000 < Date.now()) {
-//           logout()
-//         } else {
-//           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-//         }
-//       } catch (error) {
-//         console.error("Invalid token:", error)
-//         logout()
-//       }
-//     }
-//   }, []) 
-
-//   const login = (accessToken, userData) => {
-//     localStorage.setItem('accessToken', accessToken)
-//     localStorage.setItem('user', JSON.stringify(userData))
-//     axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`
-//     setUserState(userData) // Use the internal state setter
-//   }
-
-//   const logout = () => {
-//     localStorage.removeItem('accessToken')
-//     localStorage.removeItem('user')
-//     delete axios.defaults.headers.common['Authorization']
-//     setUserState(null) // Use the internal state setter
-//   }
-  
-//   // --- THIS IS THE FIX ---
-//   // This new function updates both the state AND localStorage,
-//   // so the user's "profile_complete: true" status persists.
-//   const setUser = (userData) => {
-//     localStorage.setItem('user', JSON.stringify(userData))
-//     setUserState(userData)
-//   }
-//   // --- END OF FIX ---
-
-//   const value = {
-//     user,
-//     login,
-//     logout,
-//     setUser // --- ADDED setUser TO THE CONTEXT VALUE ---
-//   }
-
-//   return (
-//     <AuthContext.Provider value={value}>
-//       {children}
-//     </AuthContext.Provider>
-//   )
-// }
