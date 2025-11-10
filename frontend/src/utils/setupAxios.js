@@ -7,13 +7,19 @@ const setupAxiosInterceptors = () => {
       const token = localStorage.getItem('accessToken');
       const isApiRoute = config.url.startsWith('/api');
 
-      if (isApiRoute && !token) {
-        // CRITICAL FIX: If it's a protected API route and no token exists, 
-        // cancel the request locally on the frontend.
+      // --- THIS IS THE FIX ---
+      // We must allow the register and login routes to pass through
+      // even if there is no token.
+      const isAuthRoute = config.url.startsWith('/api/register') || config.url.startsWith('/api/login');
+      
+      if (isApiRoute && !isAuthRoute && !token) {
+        // If it's any other API route, AND there is no token,
+        // then we can cancel the request.
         const error = new Error('Request cancelled: No authentication token found.');
         error.code = 'ERR_CANCELED_AUTH';
         return Promise.reject(error);
       }
+      // --- END OF FIX ---
 
       if (token) {
         // Ensure the token is always in the header if it exists

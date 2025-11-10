@@ -14,6 +14,9 @@ import { CompleteDoctorProfile } from './pages/CompleteDoctorProfile.jsx'
 // 1. IMPORT the setup function
 import setupAxiosInterceptors from './utils/setupAxios';
 
+// --- ADD THIS IMPORT ---
+import { CompleteHospitalProfile } from './pages/CompleteHospitalProfile.jsx'
+
 // 2. CRITICAL FIX: CALL the setup function once before the component structure is rendered
 setupAxiosInterceptors();
 
@@ -57,6 +60,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CompleteDoctorProfile />
+                </ProtectedRoute>
+              } 
+            />
+            {/* --- ADD THIS ROUTE --- */}
+            <Route 
+              path="/complete-hospital-profile" 
+              element={
+                <ProtectedRoute>
+                  <CompleteHospitalProfile />
                 </ProtectedRoute>
               } 
             />
