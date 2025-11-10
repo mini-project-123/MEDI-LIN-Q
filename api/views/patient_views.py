@@ -1,6 +1,8 @@
 # api/views/patient_views.py
 
 from rest_framework import generics, permissions, views, response
+# --- 1. ADD THIS IMPORT ---
+from rest_framework.parsers import MultiPartParser, FormParser 
 from api.serializers.patient_serializers import PatientProfileSerializer, PatientDetailSerializer, SimplePrescriptionSerializer, AppointmentCancelSerializer
 from api.permissions import IsPatientUser
 from api.models import Appointment, Prescription, PatientProfile # <-- Import these
@@ -18,16 +20,20 @@ from rest_framework.filters import SearchFilter
 class PatientProfileView(generics.CreateAPIView):
     """
     This view (which you already have) is for Step 2 registration (POST).
-    We leave it as-is.
     """
     serializer_class = PatientProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsPatientUser]
+    
+    # --- 2. ADD THIS LINE ---
+    # This tells the view how to handle FormData and file uploads
+    parser_classes = [MultiPartParser, FormParser] 
 
     def perform_create(self, serializer):
+        # We pass the user object from the request into the serializer
         serializer.save(user=self.request.user)
 
 
-# --- ADD THIS NEW VIEW ---
+# --- This is the main Patient Dashboard View ---
 class PatientDashboardDetailView(generics.RetrieveUpdateAPIView):
     """
     Handles GET and PATCH requests for the logged-in patient's dashboard.
@@ -39,6 +45,10 @@ class PatientDashboardDetailView(generics.RetrieveUpdateAPIView):
     # We use PatientDetailSerializer because it's already set up
     # to show nested user info, appointments, and medical reports.
     serializer_class = PatientDetailSerializer 
+    
+    # --- 3. ADD PARSERS HERE TOO ---
+    # This allows the "Settings" page to also update the profile photo
+    parser_classes = [MultiPartParser, FormParser]
 
     def get_object(self):
         """
@@ -53,31 +63,30 @@ class PatientDashboardDetailView(generics.RetrieveUpdateAPIView):
     def retrieve(self, request, *args, **kwargs):
         """
         This method is overridden to add 'prescriptions' to the
-        dashboard data, just like your teammate did for the doctor view.
+        dashboard data.
         """
-        # 1. Get the patient profile object (using get_object)
         instance = self.get_object() 
-
-        # 2. Get the standard serialized data (profile, appointments, reports)
         serializer = self.get_serializer(instance)
         data = serializer.data
 
-        # 3. Manually fetch all appointments for this specific patient
+        # Manually fetch all appointments for this specific patient
         patient_appointments = Appointment.objects.filter(patient=instance)
 
-        # 4. Fetch all prescriptions linked to those appointments
+        # Fetch all prescriptions linked to those appointments
         prescriptions = Prescription.objects.filter(
             appointment__in=patient_appointments
-        ).select_related('medication', 'appointment__doctor__user').order_by('-appointment__appointment_datetime') #
+        ).select_related('medication', 'appointment__doctor__user').order_by('-appointment__created_at') 
 
-        # 5. Serialize the prescriptions
+        # Serialize the prescriptions
         prescription_serializer = SimplePrescriptionSerializer(prescriptions, many=True)
 
-        # 6. Add the prescription data to the main response
+        # Add the prescription data to the main response
         data['prescriptions'] = prescription_serializer.data
 
-        # 7. Return the combined data
         return response.Response(data)
+
+
+# --- Booking Views ---
 class PublicDoctorListView(generics.ListAPIView):
     """
     Provides a public, searchable list of all doctors.
@@ -104,7 +113,6 @@ class PublicHospitalListView(generics.ListAPIView):
     filter_backends = [SearchFilter]
     search_fields = ['name', 'address']
 
-# --- View for Creating a Booking (Step 2B) ---
 
 class AppointmentCreateView(generics.CreateAPIView):
     """
@@ -120,13 +128,9 @@ class AppointmentCreateView(generics.CreateAPIView):
         """
         serializer.save(
             patient=self.request.user.patientprofile,
-            status='pending' #
+            status='pending'
         )
         
-        # You could also add logic here to create a notification
-        # for the doctor using the create_notification util
-
-
 class PatientAppointmentManageView(generics.UpdateAPIView):
     """
     Allow a patient to update (cancel) their own appointment.
@@ -146,5 +150,6 @@ class PatientAppointmentManageView(generics.UpdateAPIView):
         """
         appointment = self.get_object()
         if appointment.status in ['completed']:
+            # Use DRF's built-in validation error
             raise serializers.ValidationError("Cannot cancel a completed appointment.")
         serializer.save()

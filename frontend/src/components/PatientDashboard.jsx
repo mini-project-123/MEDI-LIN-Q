@@ -1,354 +1,283 @@
 import React, { useState, useEffect } from 'react'
-import { Activity, TrendingUp, Heart, Calendar, AlertCircle, BarChart3 } from 'lucide-react'
-import SimpleChart from './SimpleChart'
-import PremiumFeatures from './PremiumFeatures'
+import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext' // Import useAuth
 import axios from 'axios' // Import axios
-import { useNavigate } from 'react-router-dom' // Import useNavigate
+import { Calendar, Stethoscope, FileText, Pill, Clock, AlertCircle } from 'lucide-react'
+
+// --- Helper Functions for Formatting ---
+const formatDate = (isoDate) => {
+  if (!isoDate) return 'N/A';
+  try {
+    const date = new Date(isoDate);
+    // Format to 'YYYY-MM-DD'
+    return date.toISOString().split('T')[0];
+  } catch (error) {
+    console.error('Error formatting date:', isoDate, error);
+    return 'Invalid Date';
+  }
+};
+
+const formatTime = (timeString) => {
+  if (!timeString) return 'N/A';
+  // Assuming timeString is in "HH:MM:SS" format
+  try {
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours, 10);
+    const minute = parseInt(minutes, 10);
+    
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
+    const formattedMinute = minute < 10 ? `0${minute}` : minute;
+    
+    return `${formattedHour}:${formattedMinute} ${ampm}`;
+  } catch (error) {
+    console.error('Error formatting time:', timeString, error);
+    return 'Invalid Time';
+  }
+};
+
+// We must declare this function outside the component
+// so we can pass theme to it inside the component
+const getStatusChipStyles = (status, theme) => {
+    const colors = {
+      pending: { bg: '#fffbeb', text: '#f59e0b' },
+      confirmed: { bg: '#f0f9ff', text: '#3b82f6' },
+      completed: { bg: '#f0fdf4', text: '#22c55e' },
+      cancelled: { bg: '#fef2f2', text: '#ef4444' },
+      default: { bg: theme.background || '#f3f4f6', text: theme.textSecondary || '#6b7280' }
+    }
+    const style = colors[status.toLowerCase()] || colors.default
+    
+    return {
+      padding: '0.25rem 0.75rem',
+      backgroundColor: style.bg,
+      color: style.text,
+      borderRadius: '20px',
+      fontSize: '0.8rem',
+      fontWeight: '500',
+      textTransform: 'capitalize'
+    }
+}
 
 const PatientDashboard = () => {
-  const [healthData, setHealthData] = useState(null)
+  const { theme } = useTheme()
+  const { user, logout } = useAuth() // Get user and logout
+  
+  // --- STATE FOR API DATA ---
+  const [dashboardData, setDashboardData] = useState({
+    appointments: [], // Use the 'appointments' key from the API
+    medical_reports: [], // Use the 'medical_reports' key
+    prescriptions: [] // Use the 'prescriptions' key
+  })
   const [loading, setLoading] = useState(true)
-  const navigate = useNavigate(); // Initialize navigate
-
+  const [error, setError] = useState(null)
+  
+  // --- DATA FETCHING ---
   useEffect(() => {
-    fetchHealthAnalytics()
-  }, [])
-
-  const fetchHealthAnalytics = async () => {
-    try {
+    const fetchDashboardData = async () => {
       setLoading(true)
-      
-      // This is the real API call to your backend
-      // [cite: mini-project-123/medi-lin-q/MEDI-LIN-Q-f1f2447704983cbe580896d9edf78aec33d147ff/api/urls/patient_urls.py]
-      const response = await axios.get('/api/dashboard/')
-      
-      // The backend sends raw data. We need to process it.
-      const data = response.data;
-      
-      // --- Process Backend Data to Fit Frontend Component ---
-      const total_appointments = data.appointments.length;
-      
-      const upcoming_appointments = data.appointments.filter(app => 
-        new Date(app.appointment_datetime) > new Date()
-      ).length;
+      setError(null)
+      try {
+        const token = localStorage.getItem('accessToken')
+        // Use the /api/dashboard/ endpoint
+        const response = await axios.get('/api/dashboard/', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        
+        // Filter appointments to show only upcoming ones
+        const allAppointments = response.data.appointments || [];
+        const now = new Date();
+        const upcoming = allAppointments.filter(apt => {
+            const aptDate = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
+            return aptDate >= now && (apt.status === 'pending' || apt.status === 'confirmed');
+        }).slice(0, 3); // Show max 3
 
-      // NOTE: Your backend doesn't send 'active_prescriptions' in this view.
-      // We'll have to fetch that separately later or set it to 0 for now.
-      // We will also need to adjust for 'next_appointment', 'recent_doctors', etc.
-      
-      // Process prescriptions data if it exists
-      const active_prescriptions = data.prescriptions ? data.prescriptions.filter(p => new Date(p.end_date) > new Date()).length : 0;
+        setDashboardData({
+            appointments: upcoming,
+            medical_reports: (response.data.medical_reports || []).slice(0, 3), // Show max 3
+            prescriptions: (response.data.prescriptions || []).slice(0, 5) // Show max 5
+        })
 
-      // Find next appointment
-      const next_appointment = data.appointments
-        .filter(app => new Date(app.appointment_datetime) > new Date())
-        .sort((a, b) => new Date(a.appointment_datetime) - new Date(b.appointment_datetime))[0];
-
-      // Process recent doctors (this is a simplified example)
-      // A more robust implementation would fetch doctor details based on IDs
-      const recent_doctors = data.appointments.slice(0, 3).map(app => ({
-          name: app.doctor_name || 'Dr. Unknown', // Assuming backend serializes this
-          specialization: app.doctor_specialization || 'Specialist'
-      }));
-
-      const processedData = {
-        total_appointments: total_appointments,
-        upcoming_appointments: upcoming_appointments,
-        active_prescriptions: active_prescriptions,
-        allergies: data.user.allergies || 'None', // Allergies are on the profile
-        appointments_this_month: data.appointments.filter(app => 
-          new Date(app.appointment_datetime).getMonth() === new Date().getMonth()
-        ).length,
-        appointments_last_month: data.appointments.filter(app => 
-          new Date(app.appointment_datetime).getMonth() === new Date().getMonth() - 1
-        ).length,
-         appointments_this_year: data.appointments.filter(app => 
-          new Date(app.appointment_datetime).getFullYear() === new Date().getFullYear()
-        ).length,
-        next_appointment: next_appointment ? {
-          doctor_name: next_appointment.doctor_name || 'Dr. Unknown',
-          specialization: next_appointment.doctor_specialization || 'Specialist',
-          hospital_name: next_appointment.hospital_name || 'Hospital',
-          appointment_datetime: next_appointment.appointment_datetime
-        } : null,
-        recent_doctors: recent_doctors,
-        // ... (other processing logic can be added here)
-      };
-
-      setHealthData(processedData);
-
-    } catch (error) {
-      // --- THIS IS THE KEY ---
-      // If the profile is incomplete, the API returns a 404
-      if (error.response && error.response.status === 404) {
-        // Redirect to the complete profile page
-        navigate('/complete-profile');
-      } else {
-        console.error('Error fetching health analytics:', error)
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err)
+        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          setError('Authentication failed. Please log in again.')
+          logout() // Logout on auth error
+        } else {
+          setError('Failed to load dashboard data.')
+        }
+      } finally {
+        setLoading(false)
       }
-    } finally {
-      setLoading(false)
     }
-  }
 
-  const renderHealthAnalytics = () => {
-    const appointmentHistory = [
-      { label: 'Jan', value: 2 },
-      { label: 'Feb', value: 1 },
-      { label: 'Mar', value: 3 },
-      { label: 'Apr', value: 2 },
-      { label: 'May', value: 1 },
-      { label: 'Jun', value: 3 }
-    ]
+    fetchDashboardData()
+  }, [logout])
 
-    const healthMetrics = [
-      { label: 'Blood Pressure', value: 85 },
-      { label: 'Heart Rate', value: 72 },
-      { label: 'Weight', value: 68 },
-      { label: 'BMI', value: 22 }
-    ]
-
-    const doctorVisits = [
-      { label: 'Cardiology', value: 5 },
-      { label: 'General', value: 4 },
-      { label: 'Neurology', value: 2 },
-      { label: 'Dermatology', value: 1 }
-    ]
-
-    return (
-      <div>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '2rem'
-        }}>
-          <h3 style={{ color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <BarChart3 size={24} />
-            Health Analytics
-          </h3>
-        </div>
-
-        <div className="grid grid-2" style={{ gap: '2rem', marginBottom: '2rem' }}>
-          <SimpleChart 
-            data={appointmentHistory} 
-            type="line" 
-            title="Appointment History (6 Months)" 
-            color="#10b981"
-          />
-          <SimpleChart 
-            data={healthMetrics} 
-            type="bar" 
-            title="Health Metrics" 
-            color="#3b82f6"
-          />
-        </div>
-
-        <div className="grid grid-2" style={{ gap: '2rem' }}>
-          <SimpleChart 
-            data={doctorVisits} 
-            type="pie" 
-            title="Doctor Consultations by Specialty"
-          />
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <h4 style={{ color: '#1e293b', marginBottom: '1rem', textAlign: 'center' }}>
-              Health Score
-            </h4>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                width: '120px', 
-                height: '120px', 
-                borderRadius: '50%', 
-                backgroundColor: '#dcfce7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 1rem',
-                position: 'relative'
-              }}>
-                <div style={{
-                  width: '90px',
-                  height: '90px',
-                  borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: '1.5rem'
-                }}>
-                  8.5
-                </div>
-              </div>
-              <h5 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>Excellent Health</h5>
-              <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                Based on recent checkups and vital signs
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // --- RENDER FUNCTIONS ---
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '50vh' 
-      }}>
-        <div>Loading health analytics...</div>
+      <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
+        Loading dashboard...
+      </div>
+    )
+  }
+  
+  if (error) {
+    return (
+      <div className="card" style={{ backgroundColor: '#fee2e2', borderColor: '#ef4444' }}>
+        <h3 style={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertCircle size={20} />
+          Error
+        </h3>
+        <p style={{ color: '#b91c1c' }}>{error}</p>
       </div>
     )
   }
 
   return (
     <div>
-      {/* Health Stats Cards */}
-      <div className="grid grid-3 mb-6">
-        <div className="card text-center">
-          <Activity size={32} style={{ color: '#3b82f6', margin: '0 auto 0.5rem' }} />
-          <h3 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>
-            {healthData?.total_appointments || 0}
-          </h3>
-          <p style={{ color: '#64748b' }}>Total Appointments</p>
-        </div>
-        
-        <div className="card text-center">
-          <Calendar size={32} style={{ color: '#10b981', margin: '0 auto 0.5rem' }} />
-          <h3 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>
-            {healthData?.upcoming_appointments || 0}
-          </h3>
-          <p style={{ color: '#64748b' }}>Upcoming</p>
-        </div>
-        
-        <div className="card text-center">
-          <Heart size={32} style={{ color: '#ef4444', margin: '0 auto 0.5rem' }} />
-          <h3 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>
-            {healthData?.active_prescriptions || 0}
-          </h3>
-          <p style={{ color: '#64748b' }}>Active Prescriptions</p>
-        </div>
+      <div style={{ marginBottom: '2rem' }}>
+        <h1 style={{ color: theme.text, margin: '0 0 0.5rem 0', fontSize: '2rem' }}>
+          Welcome, {user?.first_name || 'Patient'}!
+        </h1>
+        <p style={{ color: theme.textSecondary, margin: 0 }}>Here's a summary of your health dashboard.</p>
       </div>
 
-      {/* Health Alerts */}
-      {healthData?.allergies && healthData.allergies !== 'None' && (
-        <div className="card mb-6" style={{ 
-          backgroundColor: '#fef3c7', 
-          borderColor: '#f59e0b' 
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <AlertCircle size={20} style={{ color: '#92400e' }} />
-            <h4 style={{ color: '#92400e', fontWeight: '600' }}>Allergy Alert</h4>
-          </div>
-          <p style={{ color: '#92400e' }}>{healthData.allergies}</p>
-        </div>
-      )}
-
-      {/* Next Appointment */}
-      {healthData?.next_appointment ? (
-        <div className="card mb-6">
-          <h3 style={{ marginBottom: '1rem', color: '#1e293b' }}>Next Appointment</h3>
-          <div style={{ 
-            padding: '1.5rem', 
-            backgroundColor: '#f8fafc', 
-            borderRadius: '0.5rem',
-            border: '1px solid #e5e7eb'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h4 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>
-                  Dr. {healthData.next_appointment.doctor_name}
-                </h4>
-                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                  {healthData.next_appointment.specialization} • {healthData.next_appointment.hospital_name}
-                </p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ color: '#1e293b', fontWeight: '500' }}>
-                  {new Date(healthData.next_appointment.appointment_datetime).toLocaleDateString()}
-                </p>
-                <p style={{ color: '#3b82f6', fontSize: '0.9rem' }}>
-                  {new Date(healthData.next_appointment.appointment_datetime).toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-         <div className="card mb-6">
-          <h3 style={{ marginBottom: '1rem', color: '#1e293b' }}>Next Appointment</h3>
-           <p style={{ color: '#64748b' }}>No upcoming appointments scheduled.</p>
-         </div>
-      )}
-
-      {/* Health Trends */}
-      <div className="grid grid-2 mb-6">
-        <div className="card">
-          <h4 style={{ marginBottom: '1rem', color: '#1e293b' }}>
-            <TrendingUp size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
-            Appointment History
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>This Month</span>
-              <span style={{ color: '#1e293b', fontWeight: '500' }}>
-                {healthData?.appointments_this_month || 0}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Last Month</span>
-              <span style={{ color: '#1e293b', fontWeight: '500' }}>
-                {healthData?.appointments_last_month || 0}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>This Year</span>
-              <span style={{ color: '#1e293b', fontWeight: '500' }}>
-                {healthData?.appointments_this_year || 0}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <h4 style={{ marginBottom: '1rem', color: '#1e293b' }}>
-            <Heart size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
-            Doctors Consulted
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {healthData?.recent_doctors?.length > 0 ? healthData.recent_doctors.map((doctor, index) => (
-              <div 
-                key={index}
-                style={{ 
-                  padding: '0.75rem', 
-                  backgroundColor: '#f8fafc', 
-                  borderRadius: '0.5rem' 
-                }}
-              >
-                <p style={{ color: '#1e293b', fontWeight: '500', fontSize: '0.9rem' }}>
-                  Dr. {doctor.name}
-                </p>
-                <p style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                  {doctor.specialization}
-                </p>
-              </div>
-            )) : (
-              <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                No consultations yet
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
+        
+        {/* Upcoming Appointments */}
+        <div className="card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ color: theme.text, margin: '0 0 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Calendar size={24} style={{ color: '#3b82f6' }} />
+            Upcoming Appointments
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {dashboardData.appointments.length > 0 ? (
+              dashboardData.appointments.map(apt => {
+                // API data: { id, doctor: { ... }, appointment_date, appointment_time, status }
+                const doctorName = `Dr. ${apt.doctor.user.first_name} ${apt.doctor.user.last_name}`;
+                return (
+                  <div key={apt.id} style={{
+                    padding: '1rem',
+                    backgroundColor: theme.background || '#f8fafc',
+                    borderRadius: '8px',
+                    border: `1px solid ${theme.border || '#e5e7eb'}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ color: theme.text, fontWeight: '500' }}>{doctorName}</span>
+                      <span style={getStatusChipStyles(apt.status, theme)}>{apt.status}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: theme.textSecondary, fontSize: '0.9rem' }}>
+                      <Calendar size={16} />
+                      <span>{formatDate(apt.appointment_date)}</span>
+                      <Clock size={16} style={{ marginLeft: '1rem' }} />
+                      <span>{formatTime(apt.appointment_time)}</span>
+                    </div>
+                  </div>
+                )
+              })
+            ) : (
+              <p style={{ color: theme.textSecondary, textAlign: 'center', margin: '1rem 0' }}>
+                You have no upcoming appointments.
               </p>
             )}
           </div>
         </div>
-      </div>
 
-      {renderHealthAnalytics()}
+        {/* Recent Medical Reports */}
+        <div className="card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ color: theme.text, margin: '0 0 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <FileText size={24} style={{ color: '#10b981' }} />
+            Recent Medical Reports
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {dashboardData.medical_reports.length > 0 ? (
+              dashboardData.medical_reports.map(report => (
+                // API data: { id, report_type, created_at, report_file }
+                <div key={report.id} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '1rem', backgroundColor: theme.background || '#f8fafc',
+                  borderRadius: '8px', border: `1px solid ${theme.border || '#e5e7eb'}`
+                }}>
+                  <div>
+                    <h4 style={{ color: theme.text, margin: '0 0 0.25rem 0' }}>{report.report_type}</h4>
+                    <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>
+                      Uploaded: {formatDate(report.created_at)}
+                    </p>
+                  </div>
+                  <a
+                    href={report.report_file} // Direct link to file
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#3b82f6',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    View
+                  </a>
+                </div>
+              ))
+            ) : (
+              <p style={{ color: theme.textSecondary, textAlign: 'center', margin: '1rem 0' }}>
+                No recent reports found.
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* Recent Prescriptions */}
+        <div className="card" style={{ padding: '1.5rem', gridColumn: '1 / -1' }}>
+          <h3 style={{ color: theme.text, margin: '0 0 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Pill size={24} style={{ color: '#8b5cf6' }} />
+            Recent Prescriptions
+          </h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${theme.border || '#e5e7eb'}` }}>
+                  <th style={{ padding: '0.75rem 1rem', color: theme.textSecondary, fontSize: '0.85rem', fontWeight: '500', textAlign: 'left' }}>Medication</th>
+                  <th style={{ padding: '0.75rem 1rem', color: theme.textSecondary, fontSize: '0.85rem', fontWeight: '500', textAlign: 'left' }}>Dosage</th>
+                  <th style={{ padding: '0.75rem 1rem', color: theme.textSecondary, fontSize: '0.85rem', fontWeight: '500', textAlign: 'left' }}>Frequency</th>
+                  <th style={{ padding: '0.75rem 1rem', color: theme.textSecondary, fontSize: '0.85rem', fontWeight: '500', textAlign: 'left' }}>Doctor</th>
+                  <th style={{ padding: '0.75rem 1rem', color: theme.textSecondary, fontSize: '0.85rem', fontWeight: '500', textAlign: 'left' }}>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboardData.prescriptions.length > 0 ? (
+                  dashboardData.prescriptions.map(presc => {
+                    // API data: { id, medication_name, dosage, frequency, ... }
+                    // The 'patient' field has the doctor info in this serializer
+                    const doctorName = `Dr. ${presc.patient.user.first_name} ${presc.patient.user.last_name}`;
+                    return (
+                      <tr key={presc.id} style={{ borderBottom: `1px solid ${theme.border || '#e5e7eb'}` }}>
+                        <td style={{ padding: '1rem', color: theme.text, fontWeight: '500' }}>{presc.medication_name}</td>
+                        <td style={{ padding: '1rem', color: theme.textSecondary, fontSize: '0.9rem' }}>{presc.dosage}</td>
+                        <td style={{ padding: '1rem', color: theme.textSecondary, fontSize: '0.9rem' }}>{presc.frequency}</td>
+                        <td style={{ padding: '1rem', color: theme.textSecondary, fontSize: '0.9rem' }}>{doctorName}</td>
+                        <td style={{ padding: '1rem', color: theme.textSecondary, fontSize: '0.9rem' }}>{formatDate(presc.prescription_date)}</td>
+                      </tr>
+                    )
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: theme.textSecondary }}>
+                      No recent prescriptions found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
     </div>
   )
 }

@@ -1,29 +1,117 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
-import { TrendingUp, Users, Activity, Bed } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext' // Import useAuth
+import axios from 'axios' // Import axios
+import { TrendingUp, Users, Activity, Bed, AlertCircle } from 'lucide-react'
 import SimpleChart from './SimpleChart'
+
+// --- Helper Data for Chart Colors ---
+const DEPARTMENT_COLORS = {
+  'Cardiology': '#3b82f6',
+  'Orthopedics': '#10b81',
+  'OB/GYN': '#8b5cf6',
+  'Internal Medicine': '#f59e0b',
+  'Surgery': '#ef4444',
+  'ICU': '#06b6d4',
+  'Default': '#6b7280'
+}
 
 const HospitalAnalytics = () => {
   const { theme } = useTheme()
+  const { logout } = useAuth() // Get logout function
 
-  // Chart data
-  const departmentVisits = {
-    labels: ['Cardiology', 'Orthopedics', 'OB/GYN', 'Internal Med', 'Surgery', 'ICU'],
-    data: [75, 68, 65, 82, 78, 85]
+  // --- STATE FOR API DATA ---
+  const [analyticsData, setAnalyticsData] = useState({
+    // FIX: Initialize as an empty array of objects
+    departmentVisits: [], 
+    departmentDistribution: []
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // --- DATA FETCHING ---
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const token = localStorage.getItem('accessToken')
+
+        // Make the API call
+        const response = await axios.get('/api/hospital/analytics/', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        
+        const data = response.data;
+        
+        // --- Transform Backend Data for Frontend Charts ---
+        
+        // 1. Transform 'department_distribution' (a dictionary) for the Bar Chart
+        const deptVisitsLabels = Object.keys(data.department_distribution);
+        const deptVisitsData = Object.values(data.department_distribution);
+        
+        // THIS IS THE FIX: Create the array of objects
+        const transformedDeptVisits = deptVisitsLabels.map((label, index) => ({
+          label: label,
+          value: deptVisitsData[index]
+        }));
+
+        // 2. Transform 'department_distribution' (a dictionary) for the Progress Bars
+        const totalVisits = deptVisitsData.reduce((sum, count) => sum + count, 0);
+        const transformedDeptDistribution = deptVisitsLabels.map(deptName => {
+          const count = data.department_distribution[deptName];
+          return {
+            name: deptName,
+            value: totalVisits > 0 ? parseFloat(((count / totalVisits) * 100).toFixed(1)) : 0,
+            color: DEPARTMENT_COLORS[deptName] || DEPARTMENT_COLORS.Default
+          }
+        });
+
+        setAnalyticsData({
+          departmentVisits: transformedDeptVisits,
+          departmentDistribution: transformedDeptDistribution
+        });
+
+      } catch (err) {
+        console.error('Error fetching analytics:', err)
+        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          setError('Authentication failed. Please log in again.')
+          logout() // Logout on auth error
+        } else {
+          setError('Failed to load analytics data.')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAnalytics()
+  }, [logout]) // Re-run effect if logout function changes
+
+  
+  // --- RENDER FUNCTIONS ---
+  
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
+        Loading analytics...
+      </div>
+    )
   }
-
-  const departmentDistribution = [
-    { name: 'Cardiology', value: 18, color: '#3b82f6' },
-    { name: 'Orthopedics', value: 16, color: '#10b981' },
-    { name: 'OB/GYN', value: 15, color: '#8b5cf6' },
-    { name: 'Internal Medicine', value: 19, color: '#f59e0b' },
-    { name: 'Surgery', value: 18, color: '#ef4444' },
-    { name: 'ICU', value: 14, color: '#06b6d4' }
-  ]
-
-
-
-
+  
+  if (error) {
+    return (
+      <div className="card" style={{ backgroundColor: '#fee2e2', borderColor: '#ef4444' }}>
+        <h3 style={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertCircle size={20} />
+          Error
+        </h3>
+        <p style={{ color: '#b91c1c' }}>{error}</p>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -32,7 +120,7 @@ const HospitalAnalytics = () => {
         <p style={{ color: theme.textSecondary, margin: 0 }}>Hospital performance metrics and insights</p>
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Stats (Still Mock, as API doesn't provide them here) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -65,7 +153,7 @@ const HospitalAnalytics = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Activity size={24} style={{ color: '#10b981' }} />
+              <Activity size={24} style={{ color: '#10b81' }} />
             </div>
             <div>
               <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>Avg Daily Visits</p>
@@ -115,13 +203,14 @@ const HospitalAnalytics = () => {
         </div>
       </div>
 
-      {/* Charts */}
+      {/* Charts (Now connected to API data) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.5rem' }}>
           <h3 style={{ color: theme.text, margin: '0 0 1rem 0' }}>Patient Visits by Department</h3>
+          {/* THIS IS THE FIX: We just pass the transformed array directly */}
           <SimpleChart 
-            data={departmentVisits.data}
-            labels={departmentVisits.labels}
+            data={analyticsData.departmentVisits}
+            type="bar"
             color="#3b82f6"
             height={250}
           />
@@ -129,8 +218,9 @@ const HospitalAnalytics = () => {
 
         <div className="card" style={{ padding: '1.5rem' }}>
           <h3 style={{ color: theme.text, margin: '0 0 1rem 0' }}>Department Distribution</h3>
+          {/* These progress bars now use data transformed from the API */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 0' }}>
-            {departmentDistribution.map((dept, index) => (
+            {analyticsData.departmentDistribution.map((dept, index) => (
               <div key={index}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                   <span style={{ color: theme.text, fontSize: '0.9rem' }}>{dept.name}</span>
@@ -155,10 +245,6 @@ const HospitalAnalytics = () => {
           </div>
         </div>
       </div>
-
-
-
-
     </div>
   )
 }

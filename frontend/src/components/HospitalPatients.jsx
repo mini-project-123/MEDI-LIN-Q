@@ -1,12 +1,26 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
-import { Users, Calendar, Stethoscope, X, Plus, Filter, FileText, Activity } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext' // Import useAuth
+import axios from 'axios' // Import axios
+import { Users, Calendar, Stethoscope, X, Plus, Filter, FileText, Activity, Search, Phone } from 'lucide-react'
 
 const HospitalPatients = () => {
   const { theme } = useTheme()
+  const { logout } = useAuth() // Get logout function for auth errors
+  
+  // --- STATE FOR API DATA ---
+  const [patients, setPatients] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // --- STATE FOR MODALS AND FILTERS ---
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  
+  // (Note: The filter dropdown from the mock file has been removed for now,
+  // as the backend API supports search but not status filtering on this endpoint)
+  
   const [newPatient, setNewPatient] = useState({
     name: '',
     age: '',
@@ -14,85 +28,78 @@ const HospitalPatients = () => {
     phone: '',
     diagnosis: ''
   })
-  
-  const [patients] = useState([
-    {
-      id: 1,
-      name: 'John Smith',
-      patientId: 'P001',
-      age: 45,
-      gender: 'Male',
-      doctor: 'Dr. Sarah Johnson',
-      department: 'Cardiology',
-      lastVisit: '2025-10-28',
-      nextVisit: 'Next Visit: 2025-11-15',
-      status: 'Recovering',
-      statusColor: '#06b6d4'
-    },
-    {
-      id: 2,
-      name: 'Emma Wilson',
-      patientId: 'P002',
-      age: 32,
-      gender: 'Female',
-      doctor: 'Dr. Michael Chen',
-      department: 'Neurology',
-      lastVisit: '2025-10-29',
-      nextVisit: 'Next Visit: 2025-10-29',
-      status: 'Requires Check-up',
-      statusColor: '#06b6d4'
-    },
-    {
-      id: 3,
-      name: 'Robert Brown',
-      patientId: 'P003',
-      age: 56,
-      gender: 'Male',
-      doctor: 'Dr. Sarah Johnson',
-      department: 'Cardiology',
-      lastVisit: '2025-10-28',
-      nextVisit: 'Last Visit: 2025-10-28',
-      status: 'Stable, Exercising',
-      statusColor: '#10b981'
-    },
-    {
-      id: 4,
-      name: 'Lisa Anderson',
-      patientId: 'P004',
-      age: 24,
-      gender: 'Female',
-      doctor: 'Dr. Priya Patel',
-      department: 'Orthopedics',
-      lastVisit: '2025-10-31',
-      nextVisit: 'Next Visit: 2025-11-15',
-      status: 'Recovering Check-up',
-      statusColor: '#06b6d4'
+
+  // --- DATA FETCHING ---
+  useEffect(() => {
+    // This function will be called when the component loads
+    // and whenever the searchTerm changes.
+    const fetchPatients = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const token = localStorage.getItem('accessToken')
+        
+        // Prepare query parameters
+        const params = new URLSearchParams()
+        if (searchTerm) {
+          params.append('search', searchTerm)
+        }
+
+        // Make the API call
+        const response = await axios.get('/api/hospital/patients/', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          params: params
+        })
+        
+        setPatients(response.data) // Save the patient list
+
+      } catch (err) {
+        console.error('Error fetching patients:', err)
+        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          setError('Authentication failed. Please log in again.')
+          logout() // Logout on auth error
+        } else {
+          setError('Failed to load patient data.')
+        }
+      } finally {
+        setLoading(false)
+      }
     }
-  ])
 
-  const filteredPatients = patients.filter(p => {
-    if (filterStatus === 'all') return true
-    return p.status === filterStatus
-  })
+    // We'll use a timeout to avoid searching on every single keystroke
+    const searchTimeout = setTimeout(() => {
+      fetchPatients()
+    }, 500) // 500ms debounce
 
+    // Clear the timeout if the user types again quickly
+    return () => clearTimeout(searchTimeout)
+    
+  }, [searchTerm, logout]) // Re-run effect if searchTerm or logout function changes
+
+  
+  // --- MODAL & FORM HANDLERS (Mocked for now) ---
+  
   const handleAddPatient = () => {
-    alert(`Patient ${newPatient.name} added successfully!`)
+    // We will wire this up in a future step
+    alert(`(Mock) Patient ${newPatient.name} added successfully!`)
     setShowAddModal(false)
     setNewPatient({ name: '', age: '', gender: 'Male', phone: '', diagnosis: '' })
   }
 
+  // This mock data will be replaced when we build the patient detail modal
   const patientHistory = {
     appointments: [
       { date: '2025-11-01', doctor: 'Dr. Sarah Johnson', type: 'Consultation', notes: 'Initial checkup' },
       { date: '2025-10-15', doctor: 'Dr. Sarah Johnson', type: 'Follow-up', notes: 'Blood pressure monitoring' },
-      { date: '2025-09-20', doctor: 'Dr. Michael Chen', type: 'Consultation', notes: 'Referred from general physician' }
     ],
     reports: [
       { date: '2025-11-01', type: 'Blood Test', result: 'Normal', doctor: 'Dr. Sarah Johnson' },
-      { date: '2025-10-15', type: 'ECG', result: 'Stable', doctor: 'Dr. Sarah Johnson' },
-      { date: '2025-09-20', type: 'X-Ray', result: 'Clear', doctor: 'Dr. Michael Chen' }
     ]
   }
+  
+  // --- RENDER FUNCTIONS ---
 
   return (
     <div>
@@ -102,27 +109,27 @@ const HospitalPatients = () => {
           <p style={{ color: theme.textSecondary, margin: 0 }}>Complete list of patients and their visit history</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <Filter size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: theme.textSecondary }} />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+          
+          {/* Search Bar */}
+          <div style={{ position: 'relative', minWidth: '250px' }}>
+            <Search size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: theme.textSecondary }} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name or ID..."
               style={{
                 padding: '0.75rem 1rem 0.75rem 3rem',
                 borderRadius: '8px',
                 border: `1px solid ${theme.border || '#e2e8f0'}`,
                 backgroundColor: theme.cardBackground,
                 color: theme.text,
-                cursor: 'pointer',
-                fontSize: '0.9rem'
+                fontSize: '0.9rem',
+                width: '100%'
               }}
-            >
-              <option value="all">All Patients</option>
-              <option value="Recovering">Recovering</option>
-              <option value="Requires Check-up">Requires Check-up</option>
-              <option value="Stable, Exercising">Stable</option>
-            </select>
+            />
           </div>
+          
           <button
             onClick={() => setShowAddModal(true)}
             style={{
@@ -145,58 +152,101 @@ const HospitalPatients = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-        {filteredPatients.map(patient => (
-          <div 
-            key={patient.id} 
-            className="card" 
-            style={{ padding: '1.5rem', cursor: 'pointer', transition: 'transform 0.2s' }}
-            onClick={() => setSelectedPatient(patient)}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-              <div>
-                <h3 style={{ color: theme.text, margin: '0 0 0.25rem 0' }}>{patient.name}</h3>
-                <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>ID: {patient.patientId}</p>
-              </div>
-              <span style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: `${patient.statusColor}20`,
-                color: patient.statusColor,
-                borderRadius: '20px',
-                fontSize: '0.75rem',
-                fontWeight: '500'
-              }}>
-                {patient.status}
-              </span>
-            </div>
+      {/* Patient List Grid */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
+          Loading patients...
+        </div>
+      )}
+      
+      {!loading && error && (
+        <div className="card" style={{ backgroundColor: '#fee2e2', borderColor: '#ef4444' }}>
+          <h3 style={{ color: '#991b1b' }}>Error</h3>
+          <p style={{ color: '#b91c1c' }}>{error}</p>
+        </div>
+      )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Users size={16} style={{ color: theme.textSecondary }} />
-                <span style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
-                  {patient.age}y • {patient.gender}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Stethoscope size={16} style={{ color: theme.textSecondary }} />
-                <span style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
-                  {patient.doctor}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Calendar size={16} style={{ color: theme.textSecondary }} />
-                <span style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
-                  {patient.nextVisit}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {!loading && !error && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+          {patients.length > 0 ? patients.map(patient => {
+            // --- UPDATED to use API data structure ---
+            // The API provides: { user: { first_name, last_name, custom_id, gender, ... }, age: ... }
+            const patientName = `${patient.user.first_name || ''} ${patient.user.last_name || ''}`.trim();
+            const patientId = patient.user.custom_id;
+            const patientAge = patient.age;
+            const patientGender = patient.user.gender;
+            const patientPhone = patient.user.contact_no;
+            
+            // Mock data for fields not in the list serializer
+            const mockStatus = 'Stable';
+            const mockStatusColor = '#10b981'; 
 
-      {/* Patient Details Modal */}
+            return (
+              <div 
+                key={patient.user.custom_id} // Use a unique key
+                className="card" 
+                style={{ padding: '1.5rem', cursor: 'pointer', transition: 'transform 0.2s' }}
+                onClick={() => setSelectedPatient(patient)} // Pass the full patient object
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
+                  <div>
+                    <h3 style={{ color: theme.text, margin: '0 0 0.25rem 0' }}>{patientName || 'N/A'}</h3>
+                    <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>ID: {patientId}</p>
+                  </div>
+                  <span style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: `${mockStatusColor}20`,
+                    color: mockStatusColor,
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: '500'
+                  }}>
+                    {mockStatus}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Users size={16} style={{ color: theme.textSecondary }} />
+                    <span style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
+                      {patientAge || 'N/A'}y • {patientGender || 'N/A'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Phone size={16} style={{ color: theme.textSecondary }} />
+                    <span style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
+                      {patientPhone || 'No contact'}
+                    </span>
+                  </div>
+                  {/* These fields are not in the list view, but will be in the detail view */}
+                  {/* <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Stethoscope size={16} style={{ color: theme.textSecondary }} />
+                    <span style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
+                      {patient.doctor}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Calendar size={16} style={{ color: theme.textSecondary }} />
+                    <span style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
+                      {patient.nextVisit}
+                    </span>
+                  </div> */}
+                </div>
+              </div>
+            )
+          }) : (
+            <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center' }}>
+              <p style={{ color: theme.textSecondary, margin: 0, fontSize: '1rem' }}>
+                No patients found matching your search.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Patient Details Modal (Still mock) */}
       {selectedPatient && (
         <div style={{
           position: 'fixed',
@@ -220,8 +270,8 @@ const HospitalPatients = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '2rem' }}>
               <div>
-                <h2 style={{ color: theme.text, margin: '0 0 0.5rem 0' }}>{selectedPatient.name}</h2>
-                <p style={{ color: theme.textSecondary, margin: 0 }}>Patient ID: {selectedPatient.patientId}</p>
+                <h2 style={{ color: theme.text, margin: '0 0 0.5rem 0' }}>{selectedPatient.user.first_name} {selectedPatient.user.last_name}</h2>
+                <p style={{ color: theme.textSecondary, margin: 0 }}>Patient ID: {selectedPatient.user.custom_id}</p>
               </div>
               <button
                 onClick={() => setSelectedPatient(null)}
@@ -241,20 +291,20 @@ const HospitalPatients = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div>
                   <p style={{ color: theme.textSecondary, margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>Age & Gender</p>
-                  <p style={{ color: theme.text, margin: 0, fontWeight: '500' }}>{selectedPatient.age}y • {selectedPatient.gender}</p>
+                  <p style={{ color: theme.text, margin: 0, fontWeight: '500' }}>{selectedPatient.age}y • {selectedPatient.user.gender}</p>
                 </div>
                 <div>
                   <p style={{ color: theme.textSecondary, margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>Status</p>
-                  <p style={{ color: selectedPatient.statusColor, margin: 0, fontWeight: '500' }}>{selectedPatient.status}</p>
+                  <p style={{ color: '#10b981', margin: 0, fontWeight: '500' }}>(Mock) Stable</p>
                 </div>
                 <div>
                   <p style={{ color: theme.textSecondary, margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>Assigned Doctor</p>
-                  <p style={{ color: theme.text, margin: 0, fontWeight: '500' }}>{selectedPatient.doctor}</p>
+                  <p style={{ color: theme.text, margin: 0, fontWeight: '500' }}>(Mock) Dr. Sarah Johnson</p>
                 </div>
               </div>
             </div>
 
-            {/* Appointment History */}
+            {/* Appointment History (Mock) */}
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: theme.text, margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Calendar size={20} />
@@ -279,7 +329,7 @@ const HospitalPatients = () => {
               </div>
             </div>
 
-            {/* Reports */}
+            {/* Reports (Mock) */}
             <div>
               <h3 style={{ color: theme.text, margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <FileText size={20} />
@@ -307,7 +357,7 @@ const HospitalPatients = () => {
         </div>
       )}
 
-      {/* Add Patient Modal */}
+      {/* Add Patient Modal (Mock) */}
       {showAddModal && (
         <div style={{
           position: 'fixed',

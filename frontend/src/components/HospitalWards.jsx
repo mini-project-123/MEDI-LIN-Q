@@ -1,34 +1,81 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
-import { Bed, Edit, Save, X } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext' // Import useAuth
+import axios from 'axios' // Import axios
+import { Bed, AlertCircle } from 'lucide-react' // Removed Edit, Save, X
 
 const HospitalWards = () => {
   const { theme } = useTheme()
-  const [editingWard, setEditingWard] = useState(null)
-  const [wards, setWards] = useState([
-    { id: 1, name: 'Cardiology', wardId: 'W001', total: 50, occupied: 38 },
-    { id: 2, name: 'Orthopedics', wardId: 'W002', total: 40, occupied: 32 },
-    { id: 3, name: 'Obstetrics & Gynecology', wardId: 'W003', total: 35, occupied: 28 },
-    { id: 4, name: 'Internal Medicine', wardId: 'W004', total: 60, occupied: 45 },
-    { id: 5, name: 'Surgery', wardId: 'W005', total: 45, occupied: 40 },
-    { id: 6, name: 'ICU', wardId: 'W006', total: 20, occupied: 18 }
-  ])
+  const { logout } = useAuth() // Get logout function
+  
+  // --- STATE FOR API DATA ---
+  const [wards, setWards] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Note: All editing-related states (editingWard, handleUpdateWard) are removed.
 
-  const handleUpdateWard = (wardId, field, value) => {
-    setWards(wards.map(w => 
-      w.id === wardId ? { ...w, [field]: parseInt(value) || 0 } : w
-    ))
-  }
+  // --- DATA FETCHING ---
+  useEffect(() => {
+    const fetchWards = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const token = localStorage.getItem('accessToken')
 
-  const handleSaveWard = () => {
-    setEditingWard(null)
-    alert('Ward information updated successfully!')
-  }
+        // Make the API call
+        const response = await axios.get('/api/hospital/wards/', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        
+        setWards(response.data) // Save the ward list
 
+      } catch (err) {
+        console.error('Error fetching wards:', err)
+        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          setError('Authentication failed. Please log in again.')
+          logout() // Logout on auth error
+        } else {
+          setError('Failed to load ward data.')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchWards()
+  }, [logout]) // Re-run effect if logout function changes
+
+  
+  // This helper function is still needed
   const getOccupancyColor = (rate) => {
-    if (rate >= 85) return '#ef4444'
-    if (rate >= 70) return '#f59e0b'
-    return '#10b981'
+    if (rate >= 85) return '#ef4444' // Red
+    if (rate >= 70) return '#f59e0b' // Orange
+    return '#10b981' // Green
+  }
+
+  // --- RENDER FUNCTIONS ---
+  
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
+        Loading ward & bed data...
+      </div>
+    )
+  }
+  
+  if (error) {
+    return (
+      <div className="card" style={{ backgroundColor: '#fee2e2', borderColor: '#ef4444' }}>
+        <h3 style={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertCircle size={20} />
+          Error
+        </h3>
+        <p style={{ color: '#b91c1c' }}>{error}</p>
+      </div>
+    )
   }
 
   return (
@@ -39,11 +86,18 @@ const HospitalWards = () => {
       </div>
 
       <div style={{ display: 'grid', gap: '1.5rem' }}>
+        {wards.length === 0 && !loading && (
+           <div className="card" style={{ textAlign: 'center' }}>
+            <p style={{ color: theme.textSecondary, margin: 0, fontSize: '1rem' }}>
+              No ward data available.
+            </p>
+          </div>
+        )}
+
         {wards.map(ward => {
-          const available = ward.total - ward.occupied
-          const occupancy = ((ward.occupied / ward.total) * 100).toFixed(1)
+          // Data from API: name, total_beds, occupied_beds, available_beds, occupancy_rate
+          const occupancy = ward.occupancy_rate
           const occupancyColor = getOccupancyColor(parseFloat(occupancy))
-          const isEditing = editingWard === ward.id
           
           return (
             <div key={ward.id} className="card" style={{ padding: '1.5rem' }}>
@@ -63,73 +117,12 @@ const HospitalWards = () => {
                   <div>
                     <h3 style={{ color: theme.text, margin: '0 0 0.25rem 0' }}>{ward.name}</h3>
                     <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>
-                      Ward ID: {ward.wardId} • Occupancy: {occupancy}%
+                      Occupancy: {occupancy}%
                     </p>
                   </div>
                 </div>
                 
-                {!isEditing ? (
-                  <button
-                    onClick={() => setEditingWard(ward.id)}
-                    style={{
-                      padding: '0.75rem 1.25rem',
-                      backgroundColor: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.9rem',
-                      fontWeight: '500'
-                    }}
-                  >
-                    <Edit size={16} />
-                    Edit
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <button
-                      onClick={handleSaveWard}
-                      style={{
-                        padding: '0.75rem 1.25rem',
-                        backgroundColor: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.9rem',
-                        fontWeight: '500'
-                      }}
-                    >
-                      <Save size={16} />
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingWard(null)}
-                      style={{
-                        padding: '0.75rem 1.25rem',
-                        backgroundColor: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.9rem',
-                        fontWeight: '500'
-                      }}
-                    >
-                      <X size={16} />
-                      Cancel
-                    </button>
-                  </div>
-                )}
+                {/* All Edit/Save/Cancel buttons are removed */}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
@@ -141,25 +134,8 @@ const HospitalWards = () => {
                   <label style={{ display: 'block', color: theme.textSecondary, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                     Total Beds
                   </label>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      value={ward.total}
-                      onChange={(e) => handleUpdateWard(ward.id, 'total', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: `1px solid ${theme.border || '#e5e7eb'}`,
-                        borderRadius: '6px',
-                        fontSize: '1.25rem',
-                        fontWeight: 'bold',
-                        backgroundColor: theme.cardBackground,
-                        color: theme.text
-                      }}
-                    />
-                  ) : (
-                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: theme.text }}>{ward.total}</div>
-                  )}
+                  {/* Displaying read-only data from API */}
+                  <div style={{ fontSize: '2rem', fontWeight: 'bold', color: theme.text }}>{ward.total_beds}</div>
                 </div>
 
                 <div style={{
@@ -170,26 +146,8 @@ const HospitalWards = () => {
                   <label style={{ display: 'block', color: theme.textSecondary, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                     Occupied Beds
                   </label>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      value={ward.occupied}
-                      onChange={(e) => handleUpdateWard(ward.id, 'occupied', e.target.value)}
-                      max={ward.total}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: `1px solid ${theme.border || '#e5e7eb'}`,
-                        borderRadius: '6px',
-                        fontSize: '1.25rem',
-                        fontWeight: 'bold',
-                        backgroundColor: theme.cardBackground,
-                        color: theme.text
-                      }}
-                    />
-                  ) : (
-                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444' }}>{ward.occupied}</div>
-                  )}
+                  {/* Displaying read-only data from API */}
+                  <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444' }}>{ward.occupied_beds}</div>
                 </div>
 
                 <div style={{
@@ -200,8 +158,9 @@ const HospitalWards = () => {
                   <label style={{ display: 'block', color: theme.textSecondary, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                     Available Beds
                   </label>
+                  {/* Displaying read-only data from API */}
                   <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>
-                    {available}
+                    {ward.available_beds}
                   </div>
                 </div>
               </div>
