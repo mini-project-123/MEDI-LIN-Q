@@ -48,7 +48,9 @@ class User(AbstractUser):
         return None
 
     def save(self, *args, **kwargs):
+        # --- MODIFIED SECTION ---
         if not self.custom_id:
+            # Set a prefix based on role
             if self.role == 'patient':
                 prefix = 'PT'
             elif self.role == 'doctor':
@@ -58,16 +60,18 @@ class User(AbstractUser):
             elif self.role == 'staff':
                 prefix = 'ST'
             else:
-                prefix = ''
+                # Add a default prefix for any other case to prevent errors
+                prefix = 'USR' 
 
-            if prefix:
-                while True:
-                    year = date.today().year
-                    random_num = random.randint(1000, 9999)
-                    new_id = f"{prefix}-{year}-{random_num}"
-                    if not User.objects.filter(custom_id=new_id).exists():
-                        self.custom_id = new_id
-                        break
+            # Loop to find a unique ID
+            while True:
+                year = date.today().year
+                random_num = random.randint(1000, 9999)
+                new_id = f"{prefix}-{year}-{random_num}"
+                if not User.objects.filter(custom_id=new_id).exists():
+                    self.custom_id = new_id
+                    break
+        # --- END OF MODIFIED SECTION ---
 
         super().save(*args, **kwargs)
 

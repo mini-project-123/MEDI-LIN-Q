@@ -5,28 +5,30 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+# 1. REMOVE these imports completely.
+# We only want to use the auth views defined in your 'api' app.
+#
+# from rest_framework_simplejwt.views import (
+#     TokenObtainPairView,
+#     TokenRefreshView,
+# )
 
 urlpatterns = [
     # 1. Django Admin (Default)
     path("admin/", admin.site.urls),
 
-    # 2. JWT Token Endpoints (For Login)
-    # Your React app will send login requests here
-    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # 2. REMOVE BOTH default token paths.
+    # Your 'api.urls' file already handles /api/login/ and /api/login/refresh/
+    #
+    # path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    # path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # 3. Your Application API
-    # This tells Django to look in your 'api' app's urls.py file
-    # for all other API endpoints (like patients, doctors, appointments)
+    # This single line correctly includes all your app's URLs,
+    # including the correct authentication URLs.
     path("api/", include("api.urls")),
 ]
 
 # 4. Media File Serving (For Development Only)
-# This is necessary to see uploaded files (like profile pictures)
-# when DEBUG = True in settings.py
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

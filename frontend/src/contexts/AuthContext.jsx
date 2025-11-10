@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import axios from 'axios' // <-- 1. ADD THIS IMPORT
+import axios from 'axios'
 
 // Create Context
 export const AuthContext = createContext()
@@ -33,7 +33,6 @@ export const AuthProvider = ({ children }) => {
       const decodedUser = JSON.parse(decodedPayload)
       
       // The backend token payload contains role, email, etc.
-      //
       setUser({
         id: decodedUser.user_id,
         email: decodedUser.email,
@@ -49,11 +48,47 @@ export const AuthProvider = ({ children }) => {
   }
 
 
-  // --- 2. REPLACE THE OLD signup FUNCTION WITH THIS ---
+  // --- NEW login FUNCTION (Handles authentication and token storage) ---
+  const login = async (credentials) => {
+    try {
+      // 1. Prepare data for the backend.
+      const postData = {
+        username: credentials.email,
+        password: credentials.password
+      };
+
+      // 2. Make the API call
+      const response = await axios.post('/api/login/', postData);
+      
+      const { access, refresh } = response.data;
+
+      // 3. Save tokens and set user
+      localStorage.setItem('accessToken', access);
+      localStorage.setItem('refreshToken', refresh);
+      
+      decodeAndSetUser(access); 
+      
+      return { success: true };
+
+    } catch (error) {
+      // Handle failed login
+      let errorMessage = "Invalid credentials. Please try again.";
+      if (error.response && error.response.data && error.response.data.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      return { 
+        success: false, 
+        error: errorMessage
+      };
+    }
+  }
+  // --- END OF NEW login FUNCTION ---
+
+
+  // --- MODIFIED signup FUNCTION WITH ALL FIXES ---
   const signup = async (userData) => {
     try {
       // 1. Prepare the data for the backend
-      //
       const postData = {
         first_name: userData.firstName,
         last_name: userData.lastName,
@@ -63,22 +98,28 @@ export const AuthProvider = ({ children }) => {
         password2: userData.confirmPassword
       };
 
-      // 2. Handle the special case for the 'hospital' role
+      // 2. CRITICAL FIX: Handle the special case for the 'hospital' role
       if (postData.role === 'hospital') {
         postData.first_name = userData.hospitalName;
-        postData.last_name = ''; // Last name can be blank
-        // Map frontend 'hospital' role to backend 'hospital_admin' role
-        //
+        postData.last_name = ''; 
+        // A) Map role to backend value
         postData.role = 'hospital_admin'; 
+        // B) Inject password as password2 to bypass missing confirm field
         postData.password2 = userData.password;
       }
 
-      // 3. Make the API call
-      //
+      // 3. Make the API call to register the user
       await axios.post("/api/register/", postData);
 
-      // 4. On success, return success.
-      return { success: true };
+      // 4. CRITICAL FIX: Immediately log in the user after successful registration
+      // This resolves the 401 Unauthorized errors after signup.
+      const loginResult = await login(userData); 
+      
+      if (loginResult.success) {
+          return { success: true };
+      } else {
+          return { success: false, error: "Registration succeeded, but automatic login failed. Please try logging in manually." };
+      }
 
     } catch (error) {
       // 5. Handle errors from the backend
@@ -102,49 +143,9 @@ export const AuthProvider = ({ children }) => {
       };
     }
   }
-  // --- END OF signup FUNCTION ---
 
 
-  // --- 3. REPLACE THE MOCK login FUNCTION WITH THIS ---
-  const login = async (credentials) => {
-    try {
-      // 1. Prepare data for the backend.
-      // The backend expects 'username', but we set username to be email upon creation.
-      //
-      const postData = {
-        username: credentials.email,
-        password: credentials.password
-      };
-
-      // 2. Make the API call
-      //
-      const response = await axios.post('/api/login/', postData);
-      
-      const { access, refresh } = response.data;
-
-      // 3. Save tokens and set user
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('refreshToken', refresh);
-      
-      decodeAndSetUser(access); // Use our new helper
-      
-      return { success: true };
-
-    } catch (error) {
-      // Handle failed login
-      let errorMessage = "Invalid credentials. Please try again.";
-      if (error.response && error.response.data && error.response.data.detail) {
-        errorMessage = error.response.data.detail;
-      }
-      return { 
-        success: false, 
-        error: errorMessage
-      };
-    }
-  }
-  // --- END OF NEW login FUNCTION ---
-
-  // --- 4. USE THE REAL logout FUNCTION ---
+  // --- Logout Function ---
   const logout = () => {
     setUser(null)
     localStorage.removeItem('accessToken')
@@ -158,8 +159,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     signup,
-    fetchUser: decodeAndSetUser, // Expose this function
-    setUser // 7. Expose setUser
+    fetchUser: decodeAndSetUser,
+    setUser
   }
 
   return (

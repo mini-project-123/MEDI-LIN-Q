@@ -5,14 +5,17 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Login from './pages/Login'
-// 1. THIS IS THE FIX: Removed the {} braces to use the default import
 import Signup from './pages/Signup.jsx' 
 import Dashboard from './pages/Dashboard'
 import BookAppointment from './pages/BookAppointment'
 import ProtectedRoute from './components/ProtectedRoute'
 import CompleteProfile from './pages/CompleteProfile'
-// 2. This one correctly uses a named import (with braces)
 import { CompleteDoctorProfile } from './pages/CompleteDoctorProfile.jsx' 
+// 1. IMPORT the setup function
+import setupAxiosInterceptors from './utils/setupAxios';
+
+// 2. CRITICAL FIX: CALL the setup function once before the component structure is rendered
+setupAxiosInterceptors();
 
 function App() {
   return (
@@ -24,7 +27,6 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
-            {/* 3. Use the default component */}
             <Route path="/signup" element={<Signup />} />
             <Route 
               path="/dashboard" 
@@ -50,7 +52,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* 4. Use the named component */}
             <Route 
               path="/complete-doctor-profile" 
               element={

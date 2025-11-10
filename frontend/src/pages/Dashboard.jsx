@@ -6,16 +6,15 @@ import { Calendar, Users, Clock, User, Settings, Activity, Pill, FileText, Sun, 
 import DoctorDashboard from '../components/DoctorDashboard'
 import DoctorAppointments from '../components/DoctorAppointments'
 import DoctorPatients from '../components/DoctorPatients'
-import DoctorProfile from '../components/DoctorProfile' // 1. This is for the "Profile" tab
+import DoctorProfile from '../components/DoctorProfile' 
 import DoctorPrescriptions from '../components/DoctorPrescriptions'
-import DoctorSettings from '../components/DoctorSettings' // 2. This is for the "Settings" tab
+import DoctorSettings from '../components/DoctorSettings' 
 import Articles from '../components/Articles'
 import PatientDashboard from '../components/PatientDashboard'
 import PatientAppointments from '../components/PatientAppointments'
 import PatientPrescriptions from '../components/PatientPrescriptions'
 import PatientReports from '../components/PatientReports'
 import PatientSettings from '../components/PatientSettings'
-// 3. We keep UserProfile because the Patient dashboard might use it.
 import UserProfile from '../components/UserProfile' 
 import HospitalDashboard from '../components/HospitalDashboard'
 import HospitalPatients from '../components/HospitalPatients'
@@ -27,6 +26,10 @@ import HospitalReports from '../components/HospitalReports'
 import HospitalArticles from '../components/HospitalArticles'
 import HospitalAnalytics from '../components/HospitalAnalytics'
 import HospitalSettings from '../components/HospitalSettings'
+// --- 1. IMPORT THE NEW HOSPITAL PROFILE PAGE (to check against) ---
+// (We don't render it here, but App.jsx does)
+import { CompleteHospitalProfile } from './CompleteHospitalProfile'
+
 
 const Dashboard = () => {
   const { user, logout } = useAuth()
@@ -38,25 +41,35 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview')
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
-  // This effect hook correctly handles the profile completion redirect
+  // --- 2. THIS IS THE MODIFIED useEffect HOOK ---
   useEffect(() => {
+    // This effect hook correctly handles the profile completion redirect
     if (user && !user.profile_complete) {
       if (user.role === 'patient') {
         navigate('/complete-profile');
       } else if (user.role === 'doctor') {
         navigate('/complete-doctor-profile');
+      } else if (user.role === 'hospital_admin') {
+        // --- THIS IS THE FIX ---
+        // Redirect to the new hospital profile completion page
+        navigate('/complete-hospital-profile');
       }
     } 
     else if (user && user.profile_complete) {
-      if (user.role !== 'doctor') { 
+      // Profile is complete, so we can load data
+      if (user.role === 'patient') { 
+        // Only patients fetch dashboard data here
         fetchDashboardData()
       } else {
+        // For Doctors and Admins, their components fetch their own data
         setLoading(false) 
       }
     }
   }, [user, navigate]) 
+  // --- END OF MODIFIED SECTION ---
 
   const fetchDashboardData = async () => {
+    // This function is now ONLY for the patient dashboard.
     setLoading(true)
     const mockAppointments = JSON.parse(localStorage.getItem('appointments') || '[]')
     const mockStats = {
@@ -406,11 +419,7 @@ const Dashboard = () => {
         {activeTab === 'patients' && <DoctorPatients />}
         {activeTab === 'articles' && <Articles />}
         {activeTab === 'prescriptions' && <DoctorPrescriptions />}
-        
-        {/* 4. POINT "SETTINGS" TAB TO DoctorSettings */}
         {activeTab === 'settings' && <DoctorSettings />}
-        
-        {/* 5. POINT "PROFILE" TAB TO DoctorProfile */}
         {activeTab === 'profile' && <DoctorProfile />}
       </div>
     </div>
@@ -427,13 +436,17 @@ const Dashboard = () => {
         minHeight: '100vh',
         transition: 'width 0.3s ease',
         overflow: 'hidden',
-        flexShrink: 0
+        flexShrink: 0,
+        position: 'fixed', // Fixed sidebar
+        left: 0,
+        top: 0,
+        zIndex: 1000
       }}>
         {sidebarOpen && (
           <>
             {/* Logo */}
             <div style={{ padding: '1.5rem 1rem', borderBottom: '1px solid #334155' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingLeft: '1rem' }}>
                 <div style={{
                   width: '40px',
                   height: '40px',
@@ -456,7 +469,7 @@ const Dashboard = () => {
             </div>
 
             {/* Navigation */}
-            <nav style={{ padding: '0 1rem', flex: 1, overflowY: 'auto' }}>
+            <nav style={{ padding: '1rem', flex: 1, overflowY: 'auto' }}>
               {[
                 { id: 'overview', label: 'Dashboard', icon: Building2 },
                 { id: 'patients', label: 'Patients', icon: Users },
@@ -575,28 +588,33 @@ const Dashboard = () => {
         minHeight: '100vh',
         padding: '2rem', 
         backgroundColor: theme.background,
-        position: 'relative'
+        // This margin pushes the content to the right
+        marginLeft: sidebarOpen ? '280px' : '0', 
+        transition: 'margin-left 0.3s ease'
       }}>
-        {/* Toggle Button */}
+        {/* Toggle Button - Now it's part of the content area */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           style={{
-            position: 'absolute',
+            position: 'fixed', // Fixed relative to viewport
             top: '1rem',
-            left: '1rem',
-            zIndex: 100,
+            // Adjust left position based on sidebar state
+            left: sidebarOpen ? '290px' : '1rem',
+            zIndex: 1001, // Ensure it's above sidebar
             padding: '0.75rem',
             backgroundColor: '#3b82f6',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            transition: 'left 0.3s ease' // Animate its position
           }}
         >
-          <Menu size={20} />
+          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
+        {/* Add margin-top to content to avoid toggle button */}
         <div style={{ marginTop: '4rem' }}>
           {activeTab === 'overview' && <HospitalDashboard />}
           {activeTab === 'patients' && <HospitalPatients />}
@@ -621,7 +639,7 @@ const Dashboard = () => {
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center', 
-        height: '50vh' 
+        height: '100vh' // Use 100vh for a full page load
       }}>
         <div>Loading dashboard...</div>
       </div>
@@ -632,8 +650,6 @@ const Dashboard = () => {
     return renderDoctorDashboard()
   }
 
-  // NOTE: Your 'user.role' from the backend is 'hospital_admin', not 'hospital'
-  // I am changing this to 'hospital_admin' to match your backend.
   if (user.role === 'hospital_admin') {
     return renderHospitalDashboard()
   }
