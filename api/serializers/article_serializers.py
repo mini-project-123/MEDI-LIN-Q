@@ -19,29 +19,26 @@ class ArticleAuthorSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = DoctorProfile
-        fields = ['user', 'specialization', 'photo'] # You can add 'photo' here too
+        fields = ['user', 'specialization', 'photo'] 
 
 class ArticleSerializer(serializers.ModelSerializer):
     """
     The main serializer for an Article.
     It lists articles (GET) and also handles creating new ones (POST).
     """
-    author = ArticleAuthorSerializer(read_only=True) # Nests the author's details
+    # --- FIX 1: Allow author to be null ---
+    author = ArticleAuthorSerializer(read_only=True, allow_null=True) 
 
     class Meta:
         model = Article
+        # --- FIX 2: Changed 'status' to 'is_published' to match models.py ---
         fields = [
             'id', 
             'title', 
             'content', 
-            'status', 
+            'is_published', # <-- This field must match the model
             'created_at', 
             'author'
         ]
-        # We make 'content' write-only for the list view to keep it small,
-        # but readable for a detail view (which we can add later).
-        # Or, for simplicity, we can keep it readable. Let's keep it simple for now.
-        
-        # 'status' and 'author' should not be set by the user on creation,
-        # so we make them read-only in the serializer.
-        read_only_fields = ['status', 'author', 'created_at']
+        # --- FIX 3: Changed 'status' to 'is_published' ---
+        read_only_fields = ['is_published', 'author', 'created_at']

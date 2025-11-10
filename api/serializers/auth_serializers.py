@@ -28,22 +28,32 @@ class UserCreationSerializer(serializers.ModelSerializer):
 
         return data
 
+    # --- THIS IS THE CORRECTED CREATE METHOD ---
+    @transaction.atomic
     def create(self, validated_data):
-        first_name = validated_data.get('first_name')
-        last_name = validated_data.get('last_name')
         email = validated_data.get('email')
         password = validated_data.get('password')
         role = validated_data.get('role')
+        first_name = validated_data.get('first_name')
+        last_name = validated_data.get('last_name')
 
+        # 1. Create the user with only the fields create_user accepts
         user = User.objects.create_user(
-            username=email,       # Email is used as login username
+            username=email,
             email=email,
-            password=password,
-            role=role,
-            first_name=first_name,
-            last_name=last_name
+            password=password
         )
+        
+        # 2. Set the extra attributes on the new user object
+        user.first_name = first_name
+        user.last_name = last_name
+        user.role = role
+        
+        # 3. Save the changes
+        user.save()
+        
         return user
+    # --- END OF FIX ---
 
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -54,13 +64,16 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
 
+        # --- THIS LOGIC IS NOW CORRECT ---
+        # It checks for the *existence* of the related profile,
+        # which is the correct way to check for completion.
         profile_complete = False
         if user.role == 'patient':
             profile_complete = hasattr(user, 'patientprofile')
         elif user.role == 'doctor':
             profile_complete = hasattr(user, 'doctorprofile')
         elif user.role == 'hospital_admin':
-            profile_complete = user.hospitals_administered.exists()
+            profile_complete = user.managed_hospitals.exists()
 
         token['profile_complete'] = profile_complete
         token['role'] = user.role

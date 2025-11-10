@@ -15,10 +15,12 @@ class User(AbstractUser):
     # Base fields (username, password, email, first_name, last_name)
     # are inherited from AbstractUser.
     
+    # --- FIX 1: Added 'staff' role to match your migration 0005 ---
     ROLE_CHOICES = (
         ('patient', 'Patient'),
         ('doctor', 'Doctor'),
         ('hospital_admin', 'Hospital Admin'),
+        ('staff', 'Staff'), # <-- This was missing
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient')
     custom_id = models.CharField(max_length=20, unique=True, blank=True)
@@ -26,8 +28,14 @@ class User(AbstractUser):
     contact_no = models.CharField(max_length=15, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     
-    # Profile completion flags
-    is_profile_complete = models.BooleanField(default=False)
+    # --- FIX 2: Added missing fields from your migration 0001 ---
+    middle_name = models.CharField(max_length=50, blank=True)
+    address = models.TextField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # --- FIX 3: Removed this field. It's not in your database migrations ---
+    # is_profile_complete = models.BooleanField(default=False) 
+    # --- END OF FIX 3 ---
 
     def save(self, *args, **kwargs):
         if not self.custom_id:
@@ -37,6 +45,8 @@ class User(AbstractUser):
                 self.custom_id = generate_custom_id('D')
             elif self.role == 'hospital_admin':
                 self.custom_id = generate_custom_id('H')
+            elif self.role == 'staff':
+                self.custom_id = generate_custom_id('S')
             else:
                 self.custom_id = generate_custom_id('U')
         super().save(*args, **kwargs)
@@ -57,8 +67,6 @@ class PatientProfile(models.Model):
     emergency_contact_relation = models.CharField(max_length=50, blank=True)
     allergies = models.TextField(blank=True)
     
-    # --- THIS IS THE FIX ---
-    # You MUST tell Django where to upload files.
     photo = models.ImageField(upload_to='patient_photos/', blank=True, null=True)
 
 
@@ -75,7 +83,7 @@ class Hospital(models.Model):
     operating_hours = models.CharField(max_length=100, blank=True)
     photo = models.ImageField(upload_to='hospital_photos/', blank=True, null=True)
     
-    # Admin linkage
+    # This 'related_name' matches your migration 0002
     admins = models.ManyToManyField(User, related_name='managed_hospitals', blank=True)
 
     def save(self, *args, **kwargs):
@@ -98,7 +106,6 @@ class DoctorProfile(models.Model):
     languages_spoken = models.CharField(max_length=255, blank=True) # e.g., "English,Spanish"
     photo = models.ImageField(upload_to='doctor_photos/', blank=True, null=True)
     
-    # Link to the hospital
     hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, blank=True, related_name='doctors')
 
 
@@ -107,7 +114,6 @@ class StaffProfile(models.Model):
     job_title = models.CharField(max_length=100) # e.g., Nurse, Technician
     department = models.CharField(max_length=100, blank=True)
     
-    # Link to the hospital
     hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, blank=True, related_name='staff')
 
 
@@ -131,8 +137,8 @@ class Appointment(models.Model):
     doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='appointments')
     hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, related_name='appointments')
     
-    appointment_date = models.DateField()
-    appointment_time = models.TimeField()
+    appointment_date = models.DateField(null=True, blank=True)
+    appointment_time = models.TimeField(null=True, blank=True)
     appointment_type = models.CharField(max_length=20, choices=APPOINTMENT_TYPES, default='consultation')
     
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
@@ -173,7 +179,6 @@ class Prescription(models.Model):
     id = models.AutoField(primary_key=True)
     appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='prescriptions')
     
-    # Denormalized fields for quick access
     medication_name = models.CharField(max_length=100)
     dosage = models.CharField(max_length=100)
     frequency = models.CharField(max_length=100)
@@ -183,7 +188,6 @@ class Prescription(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     
-    # Optional: Link to a central medication table
     medication = models.ForeignKey(Medication, on_delete=models.SET_NULL, null=True, blank=True)
 
 

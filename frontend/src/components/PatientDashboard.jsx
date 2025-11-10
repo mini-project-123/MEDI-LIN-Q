@@ -1,43 +1,35 @@
 import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
-import { useAuth } from '../contexts/AuthContext' // Import useAuth
-import axios from 'axios' // Import axios
+import { useAuth } from '../contexts/AuthContext' 
+import axios from 'axios' 
 import { Calendar, Stethoscope, FileText, Pill, Clock, AlertCircle } from 'lucide-react'
 
-// --- Helper Functions for Formatting ---
+// --- Helper Functions (No changes here) ---
 const formatDate = (isoDate) => {
   if (!isoDate) return 'N/A';
   try {
     const date = new Date(isoDate);
-    // Format to 'YYYY-MM-DD'
     return date.toISOString().split('T')[0];
   } catch (error) {
     console.error('Error formatting date:', isoDate, error);
     return 'Invalid Date';
   }
 };
-
 const formatTime = (timeString) => {
   if (!timeString) return 'N/A';
-  // Assuming timeString is in "HH:MM:SS" format
   try {
     const [hours, minutes] = timeString.split(':');
     const hour = parseInt(hours, 10);
     const minute = parseInt(minutes, 10);
-    
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
     const formattedMinute = minute < 10 ? `0${minute}` : minute;
-    
     return `${formattedHour}:${formattedMinute} ${ampm}`;
   } catch (error) {
     console.error('Error formatting time:', timeString, error);
     return 'Invalid Time';
   }
 };
-
-// We must declare this function outside the component
-// so we can pass theme to it inside the component
 const getStatusChipStyles = (status, theme) => {
     const colors = {
       pending: { bg: '#fffbeb', text: '#f59e0b' },
@@ -47,7 +39,6 @@ const getStatusChipStyles = (status, theme) => {
       default: { bg: theme.background || '#f3f4f6', text: theme.textSecondary || '#6b7280' }
     }
     const style = colors[status.toLowerCase()] || colors.default
-    
     return {
       padding: '0.25rem 0.75rem',
       backgroundColor: style.bg,
@@ -58,51 +49,48 @@ const getStatusChipStyles = (status, theme) => {
       textTransform: 'capitalize'
     }
 }
+// --- End of Helper Functions ---
 
 const PatientDashboard = () => {
   const { theme } = useTheme()
-  const { user, logout } = useAuth() // Get user and logout
+  const { user, logout } = useAuth() 
   
-  // --- STATE FOR API DATA ---
   const [dashboardData, setDashboardData] = useState({
-    appointments: [], // Use the 'appointments' key from the API
-    medical_reports: [], // Use the 'medical_reports' key
-    prescriptions: [] // Use the 'prescriptions' key
+    appointments: [], 
+    medical_reports: [], 
+    prescriptions: [] 
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // --- DATA FETCHING ---
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true)
       setError(null)
       try {
         const token = localStorage.getItem('accessToken')
-        // Use the /api/dashboard/ endpoint
         const response = await axios.get('/api/dashboard/', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         
-        // Filter appointments to show only upcoming ones
         const allAppointments = response.data.appointments || [];
         const now = new Date();
         const upcoming = allAppointments.filter(apt => {
             const aptDate = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
             return aptDate >= now && (apt.status === 'pending' || apt.status === 'confirmed');
-        }).slice(0, 3); // Show max 3
+        }).slice(0, 3); 
 
         setDashboardData({
             appointments: upcoming,
-            medical_reports: (response.data.medical_reports || []).slice(0, 3), // Show max 3
-            prescriptions: (response.data.prescriptions || []).slice(0, 5) // Show max 5
+            medical_reports: (response.data.medical_reports || []).slice(0, 3), 
+            prescriptions: (response.data.prescriptions || []).slice(0, 5) 
         })
 
       } catch (err) {
         console.error('Error fetching dashboard data:', err)
         if (err.response && (err.response.status === 401 || err.response.status === 403)) {
           setError('Authentication failed. Please log in again.')
-          logout() // Logout on auth error
+          logout() 
         } else {
           setError('Failed to load dashboard data.')
         }
@@ -140,7 +128,7 @@ const PatientDashboard = () => {
     <div>
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ color: theme.text, margin: '0 0 0.5rem 0', fontSize: '2rem' }}>
-          Welcome, {user?.first_name || 'Patient'}!
+          Welcome, {user?.email || 'Patient'}!
         </h1>
         <p style={{ color: theme.textSecondary, margin: 0 }}>Here's a summary of your health dashboard.</p>
       </div>
@@ -156,8 +144,7 @@ const PatientDashboard = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {dashboardData.appointments.length > 0 ? (
               dashboardData.appointments.map(apt => {
-                // API data: { id, doctor: { ... }, appointment_date, appointment_time, status }
-                const doctorName = `Dr. ${apt.doctor.user.first_name} ${apt.doctor.user.last_name}`;
+                const doctorName = `Dr. N/A`; // Placeholder as SimpleAppointmentSerializer doesn't include doctor
                 return (
                   <div key={apt.id} style={{
                     padding: '1rem',
@@ -195,7 +182,6 @@ const PatientDashboard = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {dashboardData.medical_reports.length > 0 ? (
               dashboardData.medical_reports.map(report => (
-                // API data: { id, report_type, created_at, report_file }
                 <div key={report.id} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '1rem', backgroundColor: theme.background || '#f8fafc',
@@ -208,7 +194,7 @@ const PatientDashboard = () => {
                     </p>
                   </div>
                   <a
-                    href={report.report_file} // Direct link to file
+                    href={report.report_file} 
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -252,12 +238,15 @@ const PatientDashboard = () => {
               <tbody>
                 {dashboardData.prescriptions.length > 0 ? (
                   dashboardData.prescriptions.map(presc => {
-                    // API data: { id, medication_name, dosage, frequency, ... }
-                    // The 'patient' field has the doctor info in this serializer
-                    const doctorName = `Dr. ${presc.patient.user.first_name} ${presc.patient.user.last_name}`;
+                    // --- THIS IS THE FIX ---
+                    // The SimplePrescriptionSerializer provides 'doctor' as a string
+                    // and 'medication' as an object with a 'name' field
+                    const doctorName = presc.doctor || "N/A";
+                    const medicationName = presc.medication?.name || "N/A"; // Use the nested object
+                    // --- END OF FIX ---
                     return (
                       <tr key={presc.id} style={{ borderBottom: `1px solid ${theme.border || '#e5e7eb'}` }}>
-                        <td style={{ padding: '1rem', color: theme.text, fontWeight: '500' }}>{presc.medication_name}</td>
+                        <td style={{ padding: '1rem', color: theme.text, fontWeight: '500' }}>{medicationName}</td>
                         <td style={{ padding: '1rem', color: theme.textSecondary, fontSize: '0.9rem' }}>{presc.dosage}</td>
                         <td style={{ padding: '1rem', color: theme.textSecondary, fontSize: '0.9rem' }}>{presc.frequency}</td>
                         <td style={{ padding: '1rem', color: theme.textSecondary, fontSize: '0.9rem' }}>{doctorName}</td>

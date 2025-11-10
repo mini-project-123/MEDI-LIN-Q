@@ -5,7 +5,11 @@ import axios from 'axios'
 import { User, Phone, Heart, Users, Upload, Loader2, AlertCircle } from 'lucide-react'
 
 const CompleteProfile = () => {
-  const { user, login } = useAuth()
+  // --- THIS IS THE FIX ---
+  // We need the 'setUser' function from useAuth, not 'login'
+  const { user, setUser } = useAuth()
+  // --- END OF FIX ---
+  
   const navigate = useNavigate()
   
   const [formDataState, setFormDataState] = useState({
@@ -48,28 +52,33 @@ const CompleteProfile = () => {
     }
 
     try {
-      // The token is now set globally by AuthContext,
-      // so we don't need to add it manually here.
+      // --- THIS IS THE FIX ---
+      // We must manually add the Authorization header because AuthContext
+      // default headers can be overridden by multipart/form-data.
+      const token = localStorage.getItem('accessToken');
       
       const response = await axios.post('/api/profile/patient/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          // --- THE MANUAL 'Authorization' HEADER IS NOW REMOVED ---
+          'Authorization': `Bearer ${token}` // <-- This line was missing
         }
       })
+      // --- END OF FIX ---
 
+      // --- THIS IS THE SECOND FIX ---
       // Update user in AuthContext to mark profile as complete
+      // We call 'setUser', not 'login'
       if (response.data) {
         const updatedUser = {
           ...user,
-          patient_profile: {
-            ...response.data
-          },
-          is_profile_complete: true
+          // The backend /api/dashboard/ view will check for the profile's
+          // existence, so we just need to update the flag in the frontend.
+          profile_complete: true 
         }
         // Save updated user data back into context
-        login(localStorage.getItem('accessToken'), updatedUser)
+        setUser(updatedUser) // <-- This now correctly calls setUser
       }
+      // --- END OF FIX ---
       
       setIsLoading(false)
       navigate('/dashboard')
@@ -251,7 +260,7 @@ const CompleteProfile = () => {
                 placeholder="e.g., Peanuts, Penicillin"
                 rows={3}
                 style={{
-                  width: '1A00%', padding: '0.75rem', border: `1px solid ${errors.allergies ? '#ef4444' : '#d1d5db'}`,
+                  width: '100%', padding: '0.75rem', border: `1px solid ${errors.allergies ? '#ef4444' : '#d1d5db'}`,
                   borderRadius: '8px', fontSize: '1rem', resize: 'vertical'
                 }}
               />
