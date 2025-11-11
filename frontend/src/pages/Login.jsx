@@ -30,6 +30,9 @@ const Login = () => {
     const result = await login(formData)
     
     if (result.success) {
+      // Role-based redirect after successful login
+      // The user object is already set in AuthContext with decoded JWT
+      // We can access it via useAuth, but we'll let the Dashboard component handle the redirect
       navigate('/dashboard')
     } else {
       setError(result.error)

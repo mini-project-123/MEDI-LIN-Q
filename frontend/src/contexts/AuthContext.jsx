@@ -1,82 +1,87 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
-import { jwtDecode } from 'jwt-decode' // Import jwt-decode
+import { jwtDecode } from 'jwt-decode'
 
-// Create Context
 export const AuthContext = createContext()
 
-// AuthProvider Component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true) // Start loading by default
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // This effect runs when the app first loads
-    // It tries to set the user if a token is present
     const token = localStorage.getItem('accessToken')
     if (token) {
       try {
         const decoded = jwtDecode(token)
         if (decoded.exp * 1000 < Date.now()) {
-          // Token is expired
           console.log("Token expired, logging out.")
           logout()
         } else {
-          // Token is valid, set user and default header
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
           decodeAndSetUser(token)
         }
       } catch (error) {
         console.error("Invalid token on load", error)
-        logout() // Clear invalid token
+        logout()
       }
     }
     setLoading(false)
   }, [])
 
-  // HELPER FUNCTION
-  // This decodes the JWT token to get the user's info
   const decodeAndSetUser = (token) => {
     try {
-      const decodedUser = jwtDecode(token) // Use jwtDecode
+      const decodedUser = jwtDecode(token)
       
-      // The backend token payload contains role, email, etc.
-      //
-      setUser({
+      const tempSignupData = JSON.parse(localStorage.getItem('tempSignupData'))
+      
+      const userData = {
         id: decodedUser.user_id,
         email: decodedUser.email,
         role: decodedUser.role,
         profile_complete: decodedUser.profile_complete,
-        // We'll add name later by fetching from a profile endpoint
-      });
+      };
+
+      // If temp data exists AND the user is a doctor, add it
+      if (tempSignupData && userData.role === 'doctor') {
+        // --- ADDED EMAIL AND ALL FIELDS BACK TO TEMP DATA ---
+        userData.firstName = tempSignupData.firstName;
+        userData.lastName = tempSignupData.lastName;
+        userData.email = tempSignupData.email; // Added email
+        userData.hospitalId = tempSignupData.hospitalId;
+      }
+      
+      setUser(userData);
+      
+      // Clear temp data if the profile is complete (meaning they successfully submitted Step 2)
+      if (decodedUser.profile_complete) {
+         localStorage.removeItem('tempSignupData');
+      }
+
     } catch (error) {
       console.error("Failed to decode token", error)
       setUser(null)
       localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('tempSignupData')
       delete axios.defaults.headers.common['Authorization']
     }
   }
 
 
-  // --- login FUNCTION (Handles authentication and token storage) ---
   const login = async (credentials) => {
     try {
-      // 1. Prepare data for the backend.
       const postData = {
         username: credentials.email,
         password: credentials.password
       };
 
-      // 2. Make the API call
-      const response = await axios.post('/api/login/', postData);
+      const response = await axios.post('http://127.0.0.1:8000/api/login/', postData);
       
       const { access, refresh } = response.data;
 
-      // 3. Save tokens and set user
       localStorage.setItem('accessToken', access);
       localStorage.setItem('refreshToken', refresh);
       
-      // 4. Set default header for future requests
       axios.defaults.headers.common['Authorization'] = `Bearer ${access}`
       
       decodeAndSetUser(access); 
@@ -84,7 +89,6 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
 
     } catch (error) {
-      // Handle failed login
       let errorMessage = "Invalid credentials. Please try again.";
       if (error.response && error.response.data && error.response.data.detail) {
         errorMessage = error.response.data.detail;
@@ -95,13 +99,9 @@ export const AuthProvider = ({ children }) => {
       };
     }
   }
-  // --- END OF login FUNCTION ---
 
-
-  // --- signup FUNCTION ---
   const signup = async (userData) => {
     try {
-      // 1. Prepare the data for the backend
       const postData = {
         first_name: userData.firstName,
         last_name: userData.lastName,
@@ -111,46 +111,48 @@ export const AuthProvider = ({ children }) => {
         password2: userData.confirmPassword
       };
 
-      // 2. Handle the special case for the 'hospital' role
       if (postData.role === 'hospital') {
         postData.first_name = userData.hospitalName;
         postData.last_name = ''; 
-        // A) Map role to backend value
         postData.role = 'hospital_admin'; 
-        // B) Inject password as password2 to bypass missing confirm field
         postData.password2 = userData.password;
       }
 
-      // --- NEW: Handle Doctor Signup ---
+      // --- Store ALL necessary data for Step 2 ---
       if (postData.role === 'doctor') {
-        // Store the hospital ID locally to be used on the profile completion page
-        // We use the `hospitalId` from the form's state
-        localStorage.setItem('tempDoctorHospitalId', userData.hospitalId);
+        const tempSignupData = {
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          email: userData.email, // Store email too
+          hospitalId: userData.hospitalId // This is the numeric "Hos. ID"
+        };
+        localStorage.setItem('tempSignupData', JSON.stringify(tempSignupData));
+      } else {
+        localStorage.removeItem('tempSignupData');
       }
-      // --- END OF NEW ---
 
-      // 3. Make the API call to register the user
-      await axios.post("/api/register/", postData);
+      await axios.post("http://127.0.0.1:8000/api/register/", postData);
 
-      // 4. Return success and redirect to login
       return { success: true };
 
     } catch (error) {
-      // 5. Handle errors from the backend
       let errorMessage = 'Signup failed. Please try again.';
       if (error.response && error.response.data) {
         const errors = error.response.data;
         const errorKey = Object.keys(errors)[0];
         if (errorKey && Array.isArray(errors[errorKey])) {
-          errorMessage = errors[errorKey][0];
-        } else if (typeof errors === 'string') {
-          errorMessage = errors;
+          errorMessage = `${errorKey}: ${errors[errorKey][0]}`;
+        } else if (errors.detail) {
+           errorMessage = errors.detail;
         } else if (errors.email) {
           errorMessage = errors.email[0];
         } else if (errors.password) {
           errorMessage = errors.password[0];
+        } else {
+          errorMessage = JSON.stringify(errors);
         }
       }
+      localStorage.removeItem('tempSignupData');
       return {
         success: false,
         error: errorMessage
@@ -159,17 +161,15 @@ export const AuthProvider = ({ children }) => {
   }
 
 
-  // --- Logout Function ---
   const logout = () => {
     setUser(null)
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user') // Also remove any mock user data
-    localStorage.removeItem('tempDoctorHospitalId') // --- ENSURE TEMP ID IS CLEARED ---
-    delete axios.defaults.headers.common['Authorization'] // Remove default header
+    localStorage.removeItem('user')
+    localStorage.removeItem('tempSignupData')
+    delete axios.defaults.headers.common['Authorization']
   }
 
-  // Value provided to consumers
   const value = {
     user,
     loading,
@@ -177,7 +177,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     signup,
     fetchUser: decodeAndSetUser,
-    setUser // Expose setUser for profile completion
+    setUser
   }
 
   return (
@@ -187,7 +187,6 @@ export const AuthProvider = ({ children }) => {
   )
 }
 
-// Custom hook to use AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (context === undefined) {

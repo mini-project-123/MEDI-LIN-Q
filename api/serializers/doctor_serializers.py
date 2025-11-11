@@ -1,11 +1,21 @@
 from rest_framework import serializers
-from api.models import DoctorProfile, User, PatientProfile, Appointment
+# --- 1. IMPORT THE HOSPITAL MODEL ---
+from api.models import DoctorProfile, User, PatientProfile, Appointment, Hospital
 
-# --- 1. PROFILE CREATION SERIALIZER ---
+# --- 2. PROFILE CREATION SERIALIZER ---
 # Used for the "Step 2" registration form
 class DoctorProfileSerializer(serializers.ModelSerializer):
+    
+    # --- 3. THIS IS THE FIX ---
+    # This field tells Django to accept a numeric Primary Key (like 40)
+    # for the 'hospital' field.
+    hospital = serializers.PrimaryKeyRelatedField(
+        queryset=Hospital.objects.all()
+    )
+    
     class Meta:
         model = DoctorProfile
+        # All fields from your drawing are included here
         fields = [
             'specialization', 
             'qualification', 
@@ -15,56 +25,41 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
             'hospital', 
             'photo'
         ]
-        # 'user' is added automatically in the view
 
-# --- 2. RE-USABLE NESTED SERIALIZERS ---
-# These are used by other serializers to show patient info
+
+# --- 4. RE-USABLE NESTED SERIALIZERS ---
+# (These are unchanged)
 
 class SimplePatientUserSerializer(serializers.ModelSerializer):
-    """
-    Formats basic User info (name, custom ID) for patient display.
-    """
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'custom_id']
-        read_only = True # Make fields read-only as they are nested
-
-class SimplePatientProfileSerializer(serializers.ModelSerializer):
-    """
-    Formats the patient profile, nesting the user info.
-    """
-    user = SimplePatientUserSerializer(read_only=True) # Nests the serializer above
-    class Meta:
-        model = PatientProfile
-        fields = ['user'] # We only care about the nested 'user' info here
         read_only = True
 
-# --- 3. DASHBOARD SUMMARY SERIALIZER ---
-# Used for the "Next Appointment" card on the main dashboard
+class SimplePatientProfileSerializer(serializers.ModelSerializer):
+    user = SimplePatientUserSerializer(read_only=True)
+    class Meta:
+        model = PatientProfile
+        fields = ['user']
+        read_only = True
+
+# --- 5. DASHBOARD SUMMARY SERIALIZER ---
+# (These are unchanged)
 
 class NextAppointmentSerializer(serializers.ModelSerializer):
-    """
-    Formats the "Next Appointment" card, including basic patient info.
-    """
-    patient = SimplePatientProfileSerializer(read_only=True) # Nests patient info
+    patient = SimplePatientProfileSerializer(read_only=True)
     class Meta:
         model = Appointment
         fields = ['id', 'patient', 'appointment_datetime']
         read_only = True
 
-# --- 4. "MY APPOINTMENTS" PAGE SERIALIZER ---
-# Used for the main list on the appointments page
+# --- 6. "MY APPOINTMENTS" PAGE SERIALIZER ---
+# (These are unchanged)
 
 class DoctorAppointmentSerializer(serializers.ModelSerializer):
-    """
-    Formats an appointment for the doctor's main appointment list.
-    Includes key patient details.
-    """
-    patient = SimplePatientProfileSerializer(read_only=True) # Nests patient info
-
+    patient = SimplePatientProfileSerializer(read_only=True)
     class Meta:
         model = Appointment
-        # Define the fields we want in the list for each appointment
         fields = [
             'id',
             'custom_id',
@@ -74,8 +69,3 @@ class DoctorAppointmentSerializer(serializers.ModelSerializer):
             'token_number'
         ]
         read_only = True
-
-
-
-
-

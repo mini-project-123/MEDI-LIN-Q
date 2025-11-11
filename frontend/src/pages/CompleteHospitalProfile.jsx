@@ -28,7 +28,7 @@ export const CompleteHospitalProfile = () => {
     const fetchHospitals = async () => {
       try {
         const token = localStorage.getItem('accessToken')
-        const response = await axios.get('/api/booking/hospitals/', {
+        const response = await axios.get('http://127.0.0.1:8000/api/booking/hospitals/', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         // This is just to populate a list, but our form is for *creating* a hospital.
@@ -78,7 +78,7 @@ export const CompleteHospitalProfile = () => {
     }
 
     try {
-      await axios.post('/api/profile/hospital/', profileData, {
+      await axios.post('http://127.0.0.1:8000/api/profile/hospital/', profileData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'

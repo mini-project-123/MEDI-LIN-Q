@@ -3,16 +3,14 @@ import { Users, Calendar, Clock, TrendingUp, User, Phone, Mail, Activity, BarCha
 import SimpleChart from './SimpleChart'
 import PremiumFeatures from './PremiumFeatures'
 import SuccessStories from './SuccessStories'
-import axios from 'axios' // 1. Import axios
-import { useNavigate } from 'react-router-dom' // 2. Import useNavigate
+import { doctorAPI } from '../utils/api'
+import { useNavigate } from 'react-router-dom'
 
 const DoctorDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null)
-  const [appointments, setAppointments] = useState([])
-  const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
-  const navigate = useNavigate() // 3. Initialize navigate
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchDashboardData()
@@ -22,81 +20,14 @@ const DoctorDashboard = () => {
     try {
       setLoading(true)
       
-      // 4. --- This is the new API Call ---
-      //
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get('/api/doctor/dashboard-summary/', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = response.data;
+      const response = await doctorAPI.getDashboardSummary()
+      const data = response.data
 
-      // 5. Save the backend data to state
       setDashboardData(data)
-
-      // (These are for other tabs, we will integrate them later)
-      const mockAppointments = [
-        {
-          id: 1,
-          appointment_datetime: '2024-01-19T10:00:00',
-          status: 'confirmed',
-          patient: {
-            user: {
-              first_name: 'Emily',
-              last_name: 'Rodriguez',
-              custom_id: 'PT003'
-            }
-          },
-          token_number: 'T001'
-        },
-        {
-          id: 2,
-          appointment_datetime: '2024-01-19T14:30:00',
-          status: 'pending',
-          patient: {
-            user: {
-              first_name: 'John',
-              last_name: 'Smith',
-              custom_id: 'PT004'
-            }
-          },
-          token_number: 'T002'
-        }
-      ]
-      
-      const mockPatients = [
-        {
-          id: 1,
-          user: {
-            first_name: 'Emily',
-            last_name: 'Rodriguez',
-            custom_id: 'PT003',
-            age: 28
-          },
-          last_visit_date: '2024-01-15'
-        },
-        {
-          id: 2,
-          user: {
-            first_name: 'John',
-            last_name: 'Smith',
-            custom_id: 'PT004',
-            age: 45
-          },
-          last_visit_date: '2024-01-10'
-        }
-      ]
-      
-      setAppointments(mockAppointments)
-      setPatients(mockPatients)
       
     } catch (error) {
-      // 6. --- This is the 404/400 Profile Check ---
-      //
       if (error.response && (error.response.status === 404 || error.response.status === 400)) {
-        // If profile is not found (404) or a 400 error (like "Doctor profile not found.")
-        navigate('/complete-doctor-profile');
+        navigate('/complete-doctor-profile')
       } else {
         console.error('Error fetching dashboard data:', error)
       }
@@ -154,19 +85,11 @@ const DoctorDashboard = () => {
             </div>
           </div>
 
-          {/* This card was a mock one, let's keep it based on a mock value for now */}
           <div className="card" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.25rem 0' }}>
-                  {
-                    appointments.filter(a => {
-                      const apptDate = new Date(a.appointment_datetime);
-                      const today = new Date();
-                      const oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-                      return apptDate >= today && apptDate <= oneWeekFromNow;
-                    }).length
-                  }
+                  {stat_cards.todays_appointments_count || 0}
                 </h3>
                 <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>This Week</p>
                 <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.8rem' }}>Upcoming appointments</p>
@@ -229,26 +152,13 @@ const DoctorDashboard = () => {
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              borderRadius: '50%',
-              backgroundColor: '#f59e0b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.5rem',
-              fontWeight: 'bold',
-              color: 'white'
-            }}>
-              -
-            </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ textAlign: 'center', padding: '1rem' }}>
+              <Calendar size={48} style={{ color: '#64748b', margin: '0 auto 1rem', opacity: 0.5 }} />
               <h4 style={{ color: '#1e293b', marginBottom: '0.25rem', fontSize: '1.1rem' }}>
                 No Upcoming Appointments
               </h4>
               <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                Your schedule is clear.
+                Your schedule is clear for now
               </p>
             </div>
           </div>
@@ -257,66 +167,7 @@ const DoctorDashboard = () => {
     )
   }
 
-  const renderTodaysSchedule = () => {
-    // This is still using mock data, which is fine for this step.
-    const today = new Date().toDateString()
-    const todaysAppointments = appointments.filter(apt => 
-      new Date(apt.appointment_datetime).toDateString() === today
-    )
 
-    return (
-      <div className="card">
-        <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Today's Schedule</h3>
-        {todaysAppointments.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {todaysAppointments.map((appointment) => (
-              <div 
-                key={appointment.id}
-                style={{ 
-                  padding: '1rem', 
-                  border: '1px solid #e5e7eb', 
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <h4 style={{ color: '#1e293b', marginBottom: '0.25rem' }}>
-                    {appointment.patient?.user?.first_name} {appointment.patient?.user?.last_name}
-                  </h4>
-                  <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                    Token: {appointment.token_number} • ID: {appointment.patient?.user?.custom_id}
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: '#1e293b', fontWeight: '500' }}>
-                    {new Date(appointment.appointment_datetime).toLocaleTimeString([], { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </p>
-                  <span style={{ 
-                    padding: '0.25rem 0.5rem', 
-                    borderRadius: '0.25rem', 
-                    fontSize: '0.8rem',
-                    backgroundColor: appointment.status === 'confirmed' ? '#dcfce7' : '#fef3c7',
-                    color: appointment.status === 'confirmed' ? '#166534' : '#92400e'
-                  }}>
-                    {appointment.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: '#64748b', textAlign: 'center', padding: '2rem' }}>
-            No appointments scheduled for today.
-          </p>
-        )}
-      </div>
-    )
-  }
 
   const renderPatientDistribution = () => {
     if (!dashboardData?.visualizations) return null
@@ -352,38 +203,7 @@ const DoctorDashboard = () => {
     )
   }
 
-  const renderRecentPatients = () => {
-    const recentPatients = patients.slice(0, 5) // Still mock, which is fine
 
-    return (
-      <div className="card">
-        <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Recent Patients</h3>
-        {recentPatients.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {recentPatients.map((patient) => (
-              <div 
-                key={patient.id}
-                style={{ 
-                  padding: '1rem', 
-                  border: '1px solid #e5e7eb', 
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                {/* ... existing mock data rendering ... */}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: '#64748b', textAlign: 'center', padding: '2rem' }}>
-            No patients found.
-          </p>
-        )}
-      </div>
-    )
-  }
 
   if (loading) {
     return (
@@ -413,21 +233,9 @@ const DoctorDashboard = () => {
       value: value
     }))
 
-    const appointmentTrends = [
-      { label: 'Jan', value: 45 },
-      { label: 'Feb', value: 52 },
-      { label: 'Mar', value: 48 },
-      { label: 'Apr', value: 61 },
-      { label: 'May', value: 55 },
-      { label: 'Jun', value: 67 }
-    ]
-
-    const specialtyStats = [
-      { label: 'Cardiology', value: 85 },
-      { label: 'General', value: 45 },
-      { label: 'Emergency', value: 30 },
-      { label: 'Follow-up', value: 20 }
-    ]
+    // Use empty arrays if no data available
+    const appointmentTrends = []
+    const specialtyStats = []
 
     return (
       <div>

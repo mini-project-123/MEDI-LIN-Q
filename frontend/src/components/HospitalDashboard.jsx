@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
-import { Users, TrendingUp, Activity, Clock, User, Stethoscope } from 'lucide-react' // Added Stethoscope, User
-import axios from 'axios' // Import axios
-import { useAuth } from '../contexts/AuthContext' // Import useAuth to handle auth errors
+import { Users, TrendingUp, Activity, Clock, User, Stethoscope, Calendar, AlertCircle } from 'lucide-react'
+import { hospitalAPI } from '../utils/api'
+import { useAuth } from '../contexts/AuthContext'
 
 const HospitalDashboard = () => {
   const { theme } = useTheme()
@@ -16,28 +16,15 @@ const HospitalDashboard = () => {
       setLoading(true)
       setError(null)
       try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          logout() // Logout if no token
-          return
-        }
-
-        const response = await axios.get('/api/hospital/dashboard-summary/', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-        
+        const response = await hospitalAPI.getDashboardSummary()
         setDashboardData(response.data)
-
       } catch (err) {
         console.error('Error fetching dashboard data:', err)
         if (err.response && (err.response.status === 401 || err.response.status === 403)) {
           setError('Authentication failed. Please log in again.')
-          logout() // Logout on auth error
+          logout()
         } else if (err.response && err.response.status === 404) {
           setError('Hospital profile not found. Please complete your profile.')
-          // You might want to redirect to a profile completion page here
         } else {
           setError('Failed to load dashboard data.')
         }
@@ -47,7 +34,7 @@ const HospitalDashboard = () => {
     }
 
     fetchDashboardData()
-  }, [logout]) // Add logout as a dependency
+  }, [logout])
 
   if (loading) {
     return (
@@ -208,11 +195,11 @@ const HospitalDashboard = () => {
         </div>
       </div>
 
-      {/* Today's Appointments - Updated to use dashboardData.todays_appointments */}
+      {/* Today's Appointments */}
       <div className="card" style={{ padding: '1.5rem' }}>
         <h3 style={{ color: theme.text, margin: '0 0 1.5rem 0', fontSize: '1.25rem' }}>Today's Confirmed Appointments</h3>
         
-        {dashboardData.todays_appointments.length > 0 ? (
+        {dashboardData.todays_appointments && dashboardData.todays_appointments.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
             {dashboardData.todays_appointments.map(apt => (
               <div key={apt.id} style={{
@@ -259,7 +246,15 @@ const HospitalDashboard = () => {
             ))}
           </div>
         ) : (
-          <p style={{ color: theme.textSecondary, textAlign: 'center' }}>No confirmed appointments for today.</p>
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <Calendar size={48} style={{ color: theme.textSecondary, margin: '0 auto 1rem', opacity: 0.5 }} />
+            <p style={{ color: theme.textSecondary, margin: 0 }}>
+              No confirmed appointments for today
+            </p>
+            <p style={{ color: theme.textSecondary, margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
+              Appointments will appear here once scheduled
+            </p>
+          </div>
         )}
       </div>
     </div>

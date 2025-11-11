@@ -26,30 +26,38 @@ const BookAppointment = () => {
 
   const fetchHospitals = async () => {
     setLoading(true)
-    // Mock hospital data
-    const mockHospitals = [
-      { id: 1, name: 'City General Hospital', address: '123 Main St', city: 'New York' },
-      { id: 2, name: 'Metro Medical Center', address: '456 Oak Ave', city: 'Los Angeles' },
-      { id: 3, name: 'Children\'s Hospital', address: '789 Pine Rd', city: 'Chicago' }
-    ]
-    setTimeout(() => {
-      setHospitals(mockHospitals)
+    try {
+      const token = localStorage.getItem('accessToken')
+      const response = await fetch('http://127.0.0.1:8000/api/booking/hospitals/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await response.json()
+      setHospitals(data)
+    } catch (error) {
+      console.error('Error fetching hospitals:', error)
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   const fetchDoctors = async (hospitalId) => {
     setLoading(true)
-    // Mock doctor data
-    const mockDoctors = [
-      { id: 1, name: 'Dr. Sarah Johnson', specialty: 'Cardiology', hospital_id: hospitalId },
-      { id: 2, name: 'Dr. Michael Chen', specialty: 'Neurology', hospital_id: hospitalId },
-      { id: 3, name: 'Dr. Emily Rodriguez', specialty: 'Pediatrics', hospital_id: hospitalId }
-    ]
-    setTimeout(() => {
-      setDoctors(mockDoctors)
+    try {
+      const token = localStorage.getItem('accessToken')
+      const response = await fetch(`http://127.0.0.1:8000/api/booking/doctors/?hospital=${hospitalId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await response.json()
+      setDoctors(data)
+    } catch (error) {
+      console.error('Error fetching doctors:', error)
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   const fetchAvailableSlots = async (doctorId, date) => {
@@ -91,31 +99,60 @@ const BookAppointment = () => {
     e.preventDefault()
     setLoading(true)
     
-    // Save to localStorage
-    const appointments = JSON.parse(localStorage.getItem('appointments') || '[]')
-    const newAppointment = {
-      id: Date.now(),
-      ...bookingData,
-      status: 'confirmed',
-      createdAt: new Date().toISOString()
-    }
-    appointments.push(newAppointment)
-    localStorage.setItem('appointments', JSON.stringify(appointments))
-    
-    setTimeout(() => {
-      setLoading(false)
-      alert('Appointment booked successfully!')
-      // Reset form
-      setBookingData({
-        hospitalId: '',
-        doctorId: '',
-        date: '',
-        timeSlot: '',
-        reason: '',
-        notes: ''
+    try {
+      const token = localStorage.getItem('accessToken')
+      
+      // Convert time slot to 24-hour format
+      const timeSlot24 = bookingData.timeSlot.replace(/AM|PM/, '').trim()
+      const [hours, minutes] = timeSlot24.split(':')
+      let hour = parseInt(hours)
+      if (bookingData.timeSlot.includes('PM') && hour !== 12) {
+        hour += 12
+      } else if (bookingData.timeSlot.includes('AM') && hour === 12) {
+        hour = 0
+      }
+      const formattedTime = `${hour.toString().padStart(2, '0')}:${minutes}`
+      
+      const appointmentData = {
+        doctor: parseInt(bookingData.doctorId),
+        hospital: parseInt(bookingData.hospitalId),
+        appointment_date: bookingData.date,
+        appointment_time: formattedTime,
+        appointment_type: bookingData.reason || 'consultation',
+        notes: bookingData.notes
+      }
+      
+      const response = await fetch('http://127.0.0.1:8000/api/booking/create/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(appointmentData)
+      })
+      
+      if (response.ok) {
+        alert('Appointment booked successfully!')
+        // Reset form
+        setBookingData({
+          hospitalId: '',
+          doctorId: '',
+          date: '',
+          timeSlot: '',
+          reason: '',
+          notes: ''
         })
-      setStep(1)
-    }, 1000)
+        setStep(1)
+      } else {
+        const errorData = await response.json()
+        alert(`Failed to book appointment: ${JSON.stringify(errorData)}`)
+      }
+    } catch (error) {
+      console.error('Error booking appointment:', error)
+      alert('Failed to book appointment. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filteredHospitals = hospitals.filter(hospital =>

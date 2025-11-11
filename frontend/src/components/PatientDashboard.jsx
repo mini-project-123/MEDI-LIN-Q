@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext' 
-import axios from 'axios' 
+import { patientAPI } from '../utils/api'
 import { Calendar, Stethoscope, FileText, Pill, Clock, AlertCircle } from 'lucide-react'
 
 // --- Helper Functions (No changes here) ---
@@ -68,17 +68,14 @@ const PatientDashboard = () => {
       setLoading(true)
       setError(null)
       try {
-        const token = localStorage.getItem('accessToken')
-        const response = await axios.get('/api/dashboard/', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+        const response = await patientAPI.getDashboard()
         
-        const allAppointments = response.data.appointments || [];
-        const now = new Date();
+        const allAppointments = response.data.appointments || []
+        const now = new Date()
         const upcoming = allAppointments.filter(apt => {
-            const aptDate = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
-            return aptDate >= now && (apt.status === 'pending' || apt.status === 'confirmed');
-        }).slice(0, 3); 
+            const aptDate = new Date(`${apt.appointment_date}T${apt.appointment_time}`)
+            return aptDate >= now && (apt.status === 'pending' || apt.status === 'confirmed')
+        }).slice(0, 3)
 
         setDashboardData({
             appointments: upcoming,
@@ -144,7 +141,7 @@ const PatientDashboard = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {dashboardData.appointments.length > 0 ? (
               dashboardData.appointments.map(apt => {
-                const doctorName = `Dr. N/A`; // Placeholder as SimpleAppointmentSerializer doesn't include doctor
+                const doctorName = apt.doctor ? `Dr. ${apt.doctor.user.first_name} ${apt.doctor.user.last_name}` : 'Doctor'
                 return (
                   <div key={apt.id} style={{
                     padding: '1rem',
@@ -166,9 +163,15 @@ const PatientDashboard = () => {
                 )
               })
             ) : (
-              <p style={{ color: theme.textSecondary, textAlign: 'center', margin: '1rem 0' }}>
-                You have no upcoming appointments.
-              </p>
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <Calendar size={48} style={{ color: theme.textSecondary, margin: '0 auto 1rem', opacity: 0.5 }} />
+                <p style={{ color: theme.textSecondary, margin: 0 }}>
+                  No upcoming appointments
+                </p>
+                <p style={{ color: theme.textSecondary, margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
+                  Book your first appointment to get started
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -211,9 +214,15 @@ const PatientDashboard = () => {
                 </div>
               ))
             ) : (
-              <p style={{ color: theme.textSecondary, textAlign: 'center', margin: '1rem 0' }}>
-                No recent reports found.
-              </p>
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <FileText size={48} style={{ color: theme.textSecondary, margin: '0 auto 1rem', opacity: 0.5 }} />
+                <p style={{ color: theme.textSecondary, margin: 0 }}>
+                  No medical reports yet
+                </p>
+                <p style={{ color: theme.textSecondary, margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
+                  Your reports will appear here once uploaded
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -238,12 +247,8 @@ const PatientDashboard = () => {
               <tbody>
                 {dashboardData.prescriptions.length > 0 ? (
                   dashboardData.prescriptions.map(presc => {
-                    // --- THIS IS THE FIX ---
-                    // The SimplePrescriptionSerializer provides 'doctor' as a string
-                    // and 'medication' as an object with a 'name' field
-                    const doctorName = presc.doctor || "N/A";
-                    const medicationName = presc.medication?.name || "N/A"; // Use the nested object
-                    // --- END OF FIX ---
+                    const doctorName = presc.doctor || "N/A"
+                    const medicationName = presc.medication?.name || "N/A"
                     return (
                       <tr key={presc.id} style={{ borderBottom: `1px solid ${theme.border || '#e5e7eb'}` }}>
                         <td style={{ padding: '1rem', color: theme.text, fontWeight: '500' }}>{medicationName}</td>
@@ -256,8 +261,14 @@ const PatientDashboard = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: theme.textSecondary }}>
-                      No recent prescriptions found.
+                    <td colSpan="5" style={{ padding: '3rem', textAlign: 'center' }}>
+                      <Pill size={48} style={{ color: theme.textSecondary, margin: '0 auto 1rem', opacity: 0.5 }} />
+                      <p style={{ color: theme.textSecondary, margin: 0 }}>
+                        No prescriptions yet
+                      </p>
+                      <p style={{ color: theme.textSecondary, margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
+                        Your prescriptions will appear here after doctor visits
+                      </p>
                     </td>
                   </tr>
                 )}

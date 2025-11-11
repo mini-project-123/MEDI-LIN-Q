@@ -57,10 +57,10 @@ const CompleteProfile = () => {
       // default headers can be overridden by multipart/form-data.
       const token = localStorage.getItem('accessToken');
       
-      const response = await axios.post('/api/profile/patient/', formData, {
+      const response = await axios.post('http://127.0.0.1:8000/api/profile/patient/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}` // <-- This line was missing
+          'Authorization': `Bearer ${token}`
         }
       })
       // --- END OF FIX ---

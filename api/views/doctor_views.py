@@ -10,11 +10,10 @@ import pandas as pd
 from django.conf import settings
 import google.generativeai as genai
 import joblib
-from django.http import Http404 # <-- Make sure this is imported
+from django.http import Http404 
 
 from api.permissions import IsDoctorUser
 from api.models import Appointment, PatientProfile, User, DoctorProfile, Prescription, Medication 
-# This is the ONLY place this import should be
 from api.serializers.doctor_serializers import DoctorProfileSerializer, NextAppointmentSerializer, DoctorAppointmentSerializer
 from api.serializers.patient_serializers import (
     PatientListSerializer,
@@ -26,41 +25,41 @@ from api.serializers.patient_serializers import (
 class DoctorProfileView(generics.CreateAPIView):
     """
     API view for a logged-in doctor to create their detailed profile.
-    This view now also updates the User model with details from the form.
+    This view now updates the User model with fields from the Complete Profile form.
     """
     serializer_class = DoctorProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
-
-    # --- OVERRIDE perform_create TO SAVE TO USER MODEL ---
+    
     def perform_create(self, serializer):
         # Get the user object from the request
         user = self.request.user
         
-        # Get the validated data from the serializer
-        validated_data = serializer.validated_data
+        # Get the raw form data from the request
+        data = self.request.data 
 
-        # --- Pop the user-specific fields ---
-        # We provide a default value (the user's current value)
-        # in case the field wasn't sent in the request.
-        user.gender = validated_data.pop('gender', user.gender)
-        user.contact_no = validated_data.pop('contact_no', user.contact_no)
-        user.date_of_birth = validated_data.pop('date_of_birth', user.date_of_birth)
-        user.address = validated_data.pop('address', user.address)
+        # --- Update User model fields from the Complete Profile form ---
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        
+        # Update email/username only if provided
+        if data.get('email'):
+            user.email = data.get('email')
+            user.username = data.get('email')
+            
+        user.gender = data.get('gender', user.gender)
+        user.contact_no = data.get('contact_no', user.contact_no)
+        user.date_of_birth = data.get('date_of_birth', user.date_of_birth)
+        user.address = data.get('address', user.address)
         
         # Save the updated User model
         user.save()
         
-        # Save the DoctorProfile model with the remaining data
-        # The 'user' is passed in here, and 'hospital' is already
-        # in validated_data (as an ID) which is correct for the serializer.
-        serializer.save(user=user, **validated_data)
+        # Save the DoctorProfile model (specialization, qualification, hospital ID, etc.)
+        serializer.save(user=user)
 
 
 # --- Dashboard Summary View ---
 class DoctorDashboardSummaryView(APIView):
-    """
-    Provides all the summary data needed for the doctor's main dashboard landing page.
-    """
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
     def get(self, request, *args, **kwargs):
@@ -74,31 +73,22 @@ class DoctorDashboardSummaryView(APIView):
         this_month = today.month
         this_year = today.year
 
-        # Next Appointment
         next_appointment_obj = Appointment.objects.filter(
             doctor=doctor,
             appointment_datetime__gte=now,
             status='confirmed'
         ).order_by('appointment_datetime').first()
         next_appointment_data = NextAppointmentSerializer(next_appointment_obj).data if next_appointment_obj else None
-
-        # Total Patients
         total_patients = PatientProfile.objects.filter(appointments__doctor=doctor).distinct().count()
-
-        # This Month (New Patients)
         new_patients = PatientProfile.objects.filter(
             appointments__doctor=doctor,
             user__date_joined__month=this_month,
             user__date_joined__year=this_year
         ).distinct().count()
-
-        # Today's Appointments
         todays_appointments = Appointment.objects.filter(
             doctor=doctor,
             appointment_datetime__date=today
         ).count()
-
-        # Get all unique patients associated with this doctor
         all_patients_qs = PatientProfile.objects.filter(appointments__doctor=doctor).select_related('user').distinct()
         patient_data_list = [{'gender': p.user.gender, 'age': p.user.age} for p in all_patients_qs]
 
@@ -135,10 +125,6 @@ class DoctorDashboardSummaryView(APIView):
 
 # --- Patient List View (for Doctor) ---
 class DoctorPatientListView(generics.ListAPIView):
-    """
-    Lists patients associated with the logged-in doctor.
-    Supports searching by name or custom ID and filtering by visit date.
-    """
     serializer_class = PatientListSerializer
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
@@ -179,72 +165,41 @@ class DoctorPatientListView(generics.ListAPIView):
         return queryset
 
 
-# --- Patient Detail View (for Doctor) - UPDATED with Prescriptions ---
+# --- Patient Detail View (for Doctor) ---
 class PatientDetailForDoctorView(generics.RetrieveAPIView):
-    """
-    Retrieves the detailed profile and history for a specific patient,
-    accessible only by doctors who have treated this patient.
-    Includes manually fetched prescriptions.
-    """
     serializer_class = PatientDetailSerializer
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
-    lookup_field = 'pk' # Expects patient's User ID (pk) in the URL
+    lookup_field = 'pk' 
 
     def get_queryset(self):
-        """
-        Ensure the doctor can only view patients they are associated with.
-        """
         try:
             doctor = self.request.user.doctorprofile
         except DoctorProfile.DoesNotExist:
             return PatientProfile.objects.none()
-
-        # Ensure doctor is associated via appointments before allowing detail view
         return PatientProfile.objects.filter(appointments__doctor=doctor).distinct()
 
-    # --- Override retrieve method to add prescriptions ---
     def retrieve(self, request, *args, **kwargs):
-        # 1. Get the patient profile object
-        instance = self.get_object() # Uses get_queryset() and the pk from URL
-
-        # 2. Get the standard serialized data (details, appointments, reports)
+        instance = self.get_object() 
         serializer = self.get_serializer(instance)
         data = serializer.data
-
-        # 3. Manually fetch all appointments for this specific patient profile
-        #    We use 'instance' which is the PatientProfile object
         patient_appointments = Appointment.objects.filter(patient=instance)
-
-        # 4. Fetch all prescriptions linked to those specific appointments
         prescriptions = Prescription.objects.filter(
             appointment__in=patient_appointments
         ).select_related('medication').order_by('-appointment__appointment_datetime')
-        # select_related('medication') helps optimize the query for medication names
-
-        # 5. Serialize the prescriptions using the specific serializer
         prescription_serializer = SimplePrescriptionSerializer(prescriptions, many=True)
-
-        # 6. Add the serialized prescription data to the main response dictionary
         data['prescriptions'] = prescription_serializer.data
-
-        # 7. Return the combined data
         return Response(data)
     
 
 # --- Patient AI Summary (for Doctor) ---
 class PatientSummaryAIView(generics.RetrieveAPIView):
-    """
-    Uses a generative AI to create a summary of a patient's medical history.
-    """
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
     queryset = PatientProfile.objects.all()
-    lookup_field = 'pk' # The patient ID from the URL
+    lookup_field = 'pk' 
 
-    # Configure the Google AI client
     try:
         genai.configure(api_key=settings.GOOGLE_API_KEY)
         model = genai.GenerativeModel('gemini-pro-latest')
-        print("Gemini AI model loaded successfully.")
     except Exception as e:
         print(f"Error configuring Google AI: {e}")
         model = None
@@ -255,27 +210,18 @@ class PatientSummaryAIView(generics.RetrieveAPIView):
                 {"error": "AI model is not configured. Check API key."}, 
                 status=500
             )
-
-        # 1. Get the patient object
         patient = self.get_object()
-
-        # 2. Consolidate all text data for the patient
         history_texts = []
         history_texts.append(f"Patient Name: {patient.user.first_name} {patient.user.last_name}")
         history_texts.append(f"Age: {patient.user.age}")
         history_texts.append(f"Gender: {patient.user.gender}")
         if patient.allergies:
             history_texts.append(f"Known Allergies: {patient.allergies}")
-
-        # Get all reports
         for report in patient.medical_reports.all():
             history_texts.append(
                 f"Report from {report.created_at.date()}: "
                 f"Type: {report.report_type}, Description: {report.description}"
             )
-            
-        # Get all prescriptions
-        # Note: This is the same query from our last step!
         patient_appointments = Appointment.objects.filter(patient=patient)
         prescriptions = Prescription.objects.filter(appointment__in=patient_appointments)
         for pres in prescriptions:
@@ -285,10 +231,8 @@ class PatientSummaryAIView(generics.RetrieveAPIView):
                 f"Notes: {pres.notes}"
             )
 
-        # Combine all text into one block
         full_medical_history = "\n".join(history_texts)
         
-        # 3. Create a prompt for the AI
         prompt = f"""
         You are a helpful medical assistant. Based on the following patient data,
         provide a concise, bulleted summary of the patient's key medical history.
@@ -302,101 +246,54 @@ class PatientSummaryAIView(generics.RetrieveAPIView):
 
         Summary:
         """
-
-        # 4. Make the API call to the LLM
         try:
             response = self.model.generate_content(prompt)
             summary_text = response.text
         except Exception as e:
             return Response({"error": f"AI generation failed: {str(e)}"}, status=500)
-
-        # 5. Return the summary to the frontend
         return Response({"summary": summary_text})
     
 
 class DoctorAppointmentListView(generics.ListAPIView):
-    """
-    Provides a list of all appointments (past and future)
-    for the currently logged-in doctor.
-    
-    Supports filtering via query parameters:
-    - ?status=pending
-    - ?date=YYYY-MM-DD
-    - ?time_start=HH:MM&time_end=HH:MM (24-hour format)
-    """
     serializer_class = DoctorAppointmentSerializer
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
     def get_queryset(self):
-        """
-        This method is the core of the feature.
-        It filters the appointments based on the logged-in user
-        AND any query parameters provided in the URL.
-        """
-        # 1. Get the logged-in doctor's profile
         try:
             doctor = self.request.user.doctorprofile
         except DoctorProfile.DoesNotExist:
-            return Appointment.objects.none() # Return an empty list if no doctor profile
-
-        # 2. Start with the base query: all appointments for this doctor
+            return Appointment.objects.none() 
         queryset = Appointment.objects.filter(doctor=doctor)
-
-        # 3. --- Apply Status Filter ---
         status = self.request.query_params.get('status', None)
         if status:
-            # Filter the queryset based on the 'status' parameter
             queryset = queryset.filter(status=status)
-
-        # 4. --- Apply Specific Date Filter ---
         date_str = self.request.query_params.get('date', None)
         if date_str:
             try:
-                # Convert the date string (YYYY-MM-DD) into a date object
                 filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                # Filter appointments that fall on that specific date
                 queryset = queryset.filter(appointment_datetime__date=filter_date)
             except ValueError:
-                # If the date format is wrong, just ignore the filter
                 pass 
-
-        # 5. --- Apply Time Slot Filter ---
         time_start_str = self.request.query_params.get('time_start', None)
         time_end_str = self.request.query_params.get('time_end', None)
         if time_start_str and time_end_str:
             try:
-                # Convert time strings (HH:MM) into time objects
                 start_time = datetime.strptime(time_start_str, '%H:%M').time()
                 end_time = datetime.strptime(time_end_str, '%H:%M').time()
-                # Filter appointments where the time is between start and end
                 queryset = queryset.filter(appointment_datetime__time__gte=start_time,
                                            appointment_datetime__time__lt=end_time)
             except ValueError:
-                # If time format is wrong, ignore the filter
                 pass
-
-        # 6. Order the final, filtered list
         queryset = queryset.order_by('appointment_datetime')
-        
         return queryset
 
 
 class DoctorProfileManageView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    Handles GET, PATCH, and DELETE requests for the logged-in doctor's
-    own DoctorProfile.
-    """
     serializer_class = DoctorProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
     def get_object(self):
-        """
-        This is the key. Instead of getting a PK from the URL,
-        we return the profile linked to the logged-in user.
-        """
         try:
-            # Return the profile associated with the user making the request
             return self.request.user.doctorprofile
         except DoctorProfile.DoesNotExist:
-            # This should ideally not happen if they completed step 2 reg
             raise Http404("Doctor profile has not been created yet.")

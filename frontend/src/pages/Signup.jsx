@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext' // Correct path
-import { UserPlus, Mail, Lock, User } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+// --- IMPORT ICONS ---
+import { UserPlus, Mail, Lock, User, Building2 } from 'lucide-react'
 
-const Signup = () => { // Changed back to const Signup
+const Signup = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -11,9 +12,7 @@ const Signup = () => { // Changed back to const Signup
     password: '',
     confirmPassword: '',
     role: 'patient',
-    // Doctor specific fields
-    hospitalId: '',
-    // Hospital specific fields
+    hospitalId: '', // This is the Hos. ID from your drawing
     hospitalName: ''
   })
   const [error, setError] = useState('')
@@ -34,28 +33,23 @@ const Signup = () => { // Changed back to const Signup
     e.preventDefault()
     setError('')
 
-    // Hospital role doesn't need password confirmation
     if (formData.role !== 'hospital' && formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
       return
     }
 
-    if (formData.password.length < 6) {
+    if (formData.role !== 'hospital' && formData.password.length < 6) {
       setError('Password must be at least 6 characters long')
       return
     }
 
     setLoading(true)
 
-    // We just pass the raw formData.
-    // The signup function in AuthContext will handle all the data mapping.
     const result = await signup(formData)
     
     if (result.success) {
-      // Show success message
-      alert(`Welcome to MedLinq! Account created successfully. Please log in.`)
-      
-      // Redirect EVERYONE to the login page
+      alert(`Welcome! Account created successfully. Please log in to continue.`)
+      // Flow 1: Signup -> Login
       navigate('/login')
 
     } else {
@@ -69,16 +63,22 @@ const Signup = () => { // Changed back to const Signup
     if (formData.role === 'doctor') {
       return (
         <div className="form-group">
-          <label className="form-label">Hospital ID</label>
+          <label className="form-label">
+            <Building2 size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+            Hospital ID
+          </label>
           <input
             type="text"
-            name="hospitalId"
+            name="hospitalId" 
             value={formData.hospitalId}
             onChange={handleChange}
             className="form-input"
-            placeholder="Your hospital identification"
+            placeholder="Enter your hospital's numeric User ID (e.g., 55)"
             required
           />
+          <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+            This is the numeric User ID of your hospital (e.g., 55).
+          </p>
         </div>
       )
     }
@@ -115,7 +115,6 @@ const Signup = () => { // Changed back to const Signup
           </div>
 
           {formData.role === 'hospital' ? (
-            // Hospital form - only hospital name, email, password
             <>
               <div className="form-group">
                 <label className="form-label">
@@ -132,7 +131,6 @@ const Signup = () => { // Changed back to const Signup
                   required
                 />
               </div>
-
               <div className="form-group">
                 <label className="form-label">
                   <Mail size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
@@ -148,7 +146,6 @@ const Signup = () => { // Changed back to const Signup
                   required
                 />
               </div>
-
               <div className="form-group">
                 <label className="form-label">
                   <Lock size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
@@ -166,7 +163,6 @@ const Signup = () => { // Changed back to const Signup
               </div>
             </>
           ) : (
-            // Patient and Doctor form
             <>
               <div className="grid grid-2">
                 <div className="form-group">
@@ -184,7 +180,6 @@ const Signup = () => { // Changed back to const Signup
                     required
                   />
                 </div>
-
                 <div className="form-group">
                   <label className="form-label">Last Name</label>
                   <input
@@ -231,7 +226,6 @@ const Signup = () => { // Changed back to const Signup
                     required
                   />
                 </div>
-
                 <div className="form-group">
                   <label className="form-label">Confirm Password</label>
                   <input
@@ -277,4 +271,4 @@ const Signup = () => { // Changed back to const Signup
   )
 }
 
-export default Signup // Changed back to default export
+export default Signup
