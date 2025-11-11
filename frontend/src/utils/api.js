@@ -86,20 +86,39 @@ export const authAPI = {
 export const patientAPI = {
   // Dashboard
   getDashboard: () => api.get('/dashboard/'),
+  getAnalytics: () => api.get('/analytics/'),
   
   // Profile
   createProfile: (profileData) => api.post('/profile/patient/', profileData),
-  updateProfile: (profileData) => api.patch('/dashboard/', profileData),
+  updateProfile: (profileData) => api.patch('/profile/update/', profileData),
+  getProfile: () => api.get('/profile/update/'),
   
   // Appointments
-  getAppointments: () => api.get('/dashboard/'),
-  createAppointment: (appointmentData) => api.post('/booking/create/', appointmentData),
+  getAppointments: () => api.get('/appointments/'),
+  getAppointmentDetail: (id) => api.get(`/appointments/${id}/`),
+  createAppointment: (appointmentData) => api.post('/appointments/create/', appointmentData),
   updateAppointment: (id, data) => api.patch(`/appointments/${id}/manage/`, data),
   cancelAppointment: (id) => api.patch(`/appointments/${id}/manage/`, { status: 'cancelled' }),
   
-  // Booking
-  getDoctors: (params) => api.get('/booking/doctors/', { params }),
-  getHospitals: (params) => api.get('/booking/hospitals/', { params }),
+  // Medical Reports
+  getMedicalReports: () => api.get('/medical-reports/'),
+  getMedicalReportDetail: (id) => api.get(`/medical-reports/${id}/`),
+  uploadMedicalReport: (reportData) => api.post('/medical-reports/', reportData),
+  deleteMedicalReport: (id) => api.delete(`/medical-reports/${id}/`),
+  
+  // Prescriptions
+  getPrescriptions: (params) => api.get('/prescriptions/', { params }),
+  getPrescriptionDetail: (id) => api.get(`/prescriptions/${id}/`),
+  
+  // Notifications
+  getNotifications: () => api.get('/notifications/'),
+  getNotificationDetail: (id) => api.get(`/notifications/${id}/`),
+  markNotificationAsRead: (id) => api.patch(`/notifications/${id}/`, { is_read: true }),
+  
+  // Doctor Search
+  getDoctors: (params) => api.get('/doctors/', { params }),
+  getHospitals: (params) => api.get('/hospitals/', { params }),
+  searchDoctors: (query) => api.get('/doctors/search/', { params: { search: query } }),
 }
 
 // ==================== DOCTOR APIs ====================

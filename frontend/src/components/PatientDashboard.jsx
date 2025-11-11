@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext' 
 import { patientAPI } from '../utils/api'
-import { Calendar, Stethoscope, FileText, Pill, Clock, AlertCircle } from 'lucide-react'
+import { Calendar, Stethoscope, FileText, Pill, Clock, AlertCircle, Loader2 } from 'lucide-react' // Added Loader2
 
 // --- Helper Functions (No changes here) ---
 const formatDate = (isoDate) => {
   if (!isoDate) return 'N/A';
   try {
     const date = new Date(isoDate);
+    // This will handle both full datetime strings and date-only strings
     return date.toISOString().split('T')[0];
   } catch (error) {
     console.error('Error formatting date:', isoDate, error);
@@ -17,13 +18,16 @@ const formatDate = (isoDate) => {
 };
 const formatTime = (timeString) => {
   if (!timeString) return 'N/A';
+  // Assuming timeString is in "HH:MM:SS" or "HH:MM" format
   try {
     const [hours, minutes] = timeString.split(':');
     const hour = parseInt(hours, 10);
     const minute = parseInt(minutes, 10);
+    
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
     const formattedMinute = minute < 10 ? `0${minute}` : minute;
+    
     return `${formattedHour}:${formattedMinute} ${ampm}`;
   } catch (error) {
     console.error('Error formatting time:', timeString, error);
@@ -55,32 +59,42 @@ const PatientDashboard = () => {
   const { theme } = useTheme()
   const { user, logout } = useAuth() 
   
+  // --- 1. UPDATED STATE ---
+  // This state now matches the PatientDashboardSerializer payload
   const [dashboardData, setDashboardData] = useState({
-    appointments: [], 
-    medical_reports: [], 
-    prescriptions: [] 
+    profile: null,
+    upcoming_appointments: [],
+    recent_appointments: [], // We can use this later
+    prescriptions: [],
+    notifications: [], // We can use this later
+    stats: {},
+    medical_reports: [] // We'll derive this from profile
   })
+  // --- END OF UPDATED STATE ---
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
+  // --- 2. UPDATED useEffect ---
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true)
       setError(null)
       try {
         const response = await patientAPI.getDashboard()
-        
-        const allAppointments = response.data.appointments || []
-        const now = new Date()
-        const upcoming = allAppointments.filter(apt => {
-            const aptDate = new Date(`${apt.appointment_date}T${apt.appointment_time}`)
-            return aptDate >= now && (apt.status === 'pending' || apt.status === 'confirmed')
-        }).slice(0, 3)
+        const data = response.data; 
+
+        // Medical reports are nested inside the 'profile' object
+        const reports = data.profile?.medical_reports || [];
 
         setDashboardData({
-            appointments: upcoming,
-            medical_reports: (response.data.medical_reports || []).slice(0, 3), 
-            prescriptions: (response.data.prescriptions || []).slice(0, 5) 
+            profile: data.profile || null,
+            upcoming_appointments: (data.upcoming_appointments || []).slice(0, 3),
+            recent_appointments: (data.recent_appointments || []).slice(0, 3),
+            medical_reports: reports.slice(0, 3), 
+            prescriptions: (data.prescriptions || []).slice(0, 5),
+            notifications: data.notifications || [],
+            stats: data.stats || {} 
         })
 
       } catch (err) {
@@ -98,13 +112,22 @@ const PatientDashboard = () => {
 
     fetchDashboardData()
   }, [logout])
+  // --- END OF UPDATED useEffect ---
 
   // --- RENDER FUNCTIONS ---
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
-        Loading dashboard...
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '2rem', 
+        color: theme.textSecondary,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '50vh'
+      }}>
+        <Loader2 size={32} style={{ animation: 'spin 1s linear infinite' }} />
       </div>
     )
   }
@@ -121,11 +144,13 @@ const PatientDashboard = () => {
     )
   }
 
+  // --- 3. UPDATED JSX ---
   return (
     <div>
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ color: theme.text, margin: '0 0 0.5rem 0', fontSize: '2rem' }}>
-          Welcome, {user?.email || 'Patient'}!
+          {/* Use the name from the profile object */}
+          Welcome, {dashboardData.profile?.user?.first_name || 'Patient'}!
         </h1>
         <p style={{ color: theme.textSecondary, margin: 0 }}>Here's a summary of your health dashboard.</p>
       </div>
@@ -139,9 +164,11 @@ const PatientDashboard = () => {
             Upcoming Appointments
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {dashboardData.appointments.length > 0 ? (
-              dashboardData.appointments.map(apt => {
-                const doctorName = apt.doctor ? `Dr. ${apt.doctor.user.first_name} ${apt.doctor.user.last_name}` : 'Doctor'
+            {/* Loop over upcoming_appointments */}
+            {dashboardData.upcoming_appointments.length > 0 ? (
+              dashboardData.upcoming_appointments.map(apt => {
+                // The API provides apt.doctor.name
+                const doctorName = apt.doctor?.name || 'Doctor'
                 return (
                   <div key={apt.id} style={{
                     padding: '1rem',
@@ -155,6 +182,7 @@ const PatientDashboard = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: theme.textSecondary, fontSize: '0.9rem' }}>
                       <Calendar size={16} />
+                      {/* Use the fields from normalize_appointment_row */}
                       <span>{formatDate(apt.appointment_date)}</span>
                       <Clock size={16} style={{ marginLeft: '1rem' }} />
                       <span>{formatTime(apt.appointment_time)}</span>
@@ -183,6 +211,7 @@ const PatientDashboard = () => {
             Recent Medical Reports
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* This was already correct */}
             {dashboardData.medical_reports.length > 0 ? (
               dashboardData.medical_reports.map(report => (
                 <div key={report.id} style={{
@@ -245,9 +274,10 @@ const PatientDashboard = () => {
                 </tr>
               </thead>
               <tbody>
+                {/* This was already correct */}
                 {dashboardData.prescriptions.length > 0 ? (
                   dashboardData.prescriptions.map(presc => {
-                    const doctorName = presc.doctor || "N/A"
+                    const doctorName = presc.doctor || "N/A" // presc.doctor is a string
                     const medicationName = presc.medication?.name || "N/A"
                     return (
                       <tr key={presc.id} style={{ borderBottom: `1px solid ${theme.border || '#e5e7eb'}` }}>
@@ -281,5 +311,6 @@ const PatientDashboard = () => {
     </div>
   )
 }
+// --- END OF UPDATED JSX ---
 
 export default PatientDashboard

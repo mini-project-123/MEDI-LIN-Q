@@ -1,6 +1,6 @@
 # api/views/hospital_views.py
 
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.utils import timezone
@@ -82,9 +82,9 @@ class HospitalDashboardSummaryView(APIView):
 
         todays_appointments = Appointment.objects.filter(
             hospital=hospital,
-            appointment_datetime__date=today,
+            appointment_date=today,
             status='confirmed'
-        ).select_related('patient__user', 'doctor__user').order_by('appointment_datetime')
+        ).select_related('patient__user', 'doctor__user').order_by('appointment_date')
 
         todays_appointments_data = HospitalAppointmentListSerializer(todays_appointments, many=True).data
 
@@ -167,7 +167,7 @@ class HospitalAppointmentListView(generics.ListAPIView):
     serializer_class = HospitalAppointmentListSerializer
     permission_classes = [permissions.IsAuthenticated, IsHospitalAdminUser]
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    filterset_fields = {'status': ['exact'], 'appointment_datetime': ['date']}
+    filterset_fields = {'status': ['exact'], 'appointment_date': ['date']}
     search_fields = [
         'patient__user__first_name', 'patient__user__last_name', 'patient__user__custom_id',
         'doctor__user__first_name', 'doctor__user__last_name'
@@ -177,7 +177,7 @@ class HospitalAppointmentListView(generics.ListAPIView):
         hospital = get_admin_hospital(self.request)
         if not hospital:
             return Appointment.objects.none()
-        return Appointment.objects.filter(hospital=hospital).select_related('patient__user', 'doctor__user').order_by('-appointment_datetime')
+        return Appointment.objects.filter(hospital=hospital).select_related('patient__user', 'doctor__user').order_by('-appointment_date')
 
 
 # Analytics Dashboard
@@ -192,8 +192,8 @@ class HospitalAnalyticsView(APIView):
         twelve_months_ago = timezone.now() - relativedelta(months=12)
 
         monthly_visits_data = Appointment.objects.filter(
-            hospital=hospital, appointment_datetime__gte=twelve_months_ago
-        ).annotate(month=TruncMonth('appointment_datetime')).values('month').annotate(visits=Count('id')).order_by('month')
+            hospital=hospital, appointment_date__gte=twelve_months_ago
+        ).annotate(month=TruncMonth('appointment_date')).values('month').annotate(visits=Count('id')).order_by('month')
 
         monthly_visits = {item['month'].strftime('%Y-%m-%d'): item['visits'] for item in monthly_visits_data}
 

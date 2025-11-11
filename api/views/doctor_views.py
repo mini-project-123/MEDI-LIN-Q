@@ -75,9 +75,9 @@ class DoctorDashboardSummaryView(APIView):
 
         next_appointment_obj = Appointment.objects.filter(
             doctor=doctor,
-            appointment_datetime__gte=now,
+            appointment_date__gte=today,
             status='confirmed'
-        ).order_by('appointment_datetime').first()
+        ).order_by('appointment_date').first()
         next_appointment_data = NextAppointmentSerializer(next_appointment_obj).data if next_appointment_obj else None
         total_patients = PatientProfile.objects.filter(appointments__doctor=doctor).distinct().count()
         new_patients = PatientProfile.objects.filter(
@@ -87,7 +87,7 @@ class DoctorDashboardSummaryView(APIView):
         ).distinct().count()
         todays_appointments = Appointment.objects.filter(
             doctor=doctor,
-            appointment_datetime__date=today
+            appointment_date=today
         ).count()
         all_patients_qs = PatientProfile.objects.filter(appointments__doctor=doctor).select_related('user').distinct()
         patient_data_list = [{'gender': p.user.gender, 'age': p.user.age} for p in all_patients_qs]
@@ -146,19 +146,19 @@ class DoctorPatientListView(generics.ListAPIView):
         if visited_filter:
             today = timezone.now().date()
             if visited_filter == 'today':
-                queryset = queryset.filter(appointments__appointment_datetime__date=today).distinct()
+                queryset = queryset.filter(appointments__appointment_date=today).distinct()
             elif visited_filter == 'yesterday':
                 yesterday = today - timedelta(days=1)
-                queryset = queryset.filter(appointments__appointment_datetime__date=yesterday).distinct()
+                queryset = queryset.filter(appointments__appointment_date=yesterday).distinct()
             elif visited_filter == 'this_month':
                 queryset = queryset.filter(
-                    appointments__appointment_datetime__year=today.year,
-                    appointments__appointment_datetime__month=today.month
+                    appointments__appointment_date__year=today.year,
+                    appointments__appointment_date__month=today.month
                 ).distinct()
         elif visit_date_str:
             try:
                 specific_date = datetime.strptime(visit_date_str, '%Y-%m-%d').date()
-                queryset = queryset.filter(appointments__appointment_datetime__date=specific_date).distinct()
+                queryset = queryset.filter(appointments__appointment_date=specific_date).distinct()
             except ValueError:
                 pass
         queryset = queryset.order_by('user__last_name', 'user__first_name')
@@ -185,7 +185,7 @@ class PatientDetailForDoctorView(generics.RetrieveAPIView):
         patient_appointments = Appointment.objects.filter(patient=instance)
         prescriptions = Prescription.objects.filter(
             appointment__in=patient_appointments
-        ).select_related('medication').order_by('-appointment__appointment_datetime')
+        ).select_related('medication').order_by('-appointment__appointment_date')
         prescription_serializer = SimplePrescriptionSerializer(prescriptions, many=True)
         data['prescriptions'] = prescription_serializer.data
         return Response(data)
@@ -226,7 +226,7 @@ class PatientSummaryAIView(generics.RetrieveAPIView):
         prescriptions = Prescription.objects.filter(appointment__in=patient_appointments)
         for pres in prescriptions:
             history_texts.append(
-                f"Prescription from {pres.appointment.appointment_datetime.date()}: "
+                f"Prescription from {pres.appointment.appointment_date}: "
                 f"{pres.medication.name} ({pres.dosage}, {pres.frequency} for {pres.duration}). "
                 f"Notes: {pres.notes}"
             )
@@ -271,7 +271,7 @@ class DoctorAppointmentListView(generics.ListAPIView):
         if date_str:
             try:
                 filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                queryset = queryset.filter(appointment_datetime__date=filter_date)
+                queryset = queryset.filter(appointment_date=filter_date)
             except ValueError:
                 pass 
         time_start_str = self.request.query_params.get('time_start', None)
@@ -280,11 +280,11 @@ class DoctorAppointmentListView(generics.ListAPIView):
             try:
                 start_time = datetime.strptime(time_start_str, '%H:%M').time()
                 end_time = datetime.strptime(time_end_str, '%H:%M').time()
-                queryset = queryset.filter(appointment_datetime__time__gte=start_time,
-                                           appointment_datetime__time__lt=end_time)
+                queryset = queryset.filter(appointment_time__gte=start_time,
+                                           appointment_time__lt=end_time)
             except ValueError:
                 pass
-        queryset = queryset.order_by('appointment_datetime')
+        queryset = queryset.order_by('appointment_date')
         return queryset
 
 
