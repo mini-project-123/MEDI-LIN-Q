@@ -3,11 +3,11 @@
 from django.urls import path
 from api.views.patient_views import (
     PatientProfileView, 
-    PatientDashboardDetailView,
     PublicDoctorListView,  # <-- Import
     PublicHospitalListView, # <-- Import
     AppointmentCreateView,   # <-- Import
-    PatientAppointmentManageView
+    PatientAppointmentManageView,
+    PatientDashboardView
 )
 
 urlpatterns = [
@@ -17,7 +17,7 @@ urlpatterns = [
     # --- ADD THIS NEW URL ---
     # This single URL is for the patient's main dashboard (GET)
     # and for updating their profile (PATCH)
-    path('dashboard/', PatientDashboardDetailView.as_view(), name='patient-dashboard-detail'),
+    path('dashboard/', PatientDashboardView.as_view(), name='patient-dashboard'),
     # --- ADD THESE NEW URLS FOR BOOKING ---
     path('booking/doctors/', PublicDoctorListView.as_view(), name='public-doctor-list'),
     path('booking/hospitals/', PublicHospitalListView.as_view(), name='public-hospital-list'),

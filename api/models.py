@@ -3,6 +3,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from django.conf import settings
 import uuid
 
 # Helper function for custom ID
@@ -71,7 +72,12 @@ class PatientProfile(models.Model):
 
 
 class Hospital(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='hospitalprofile')
+    # Keep default id primary key (do NOT set primary_key=True here)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='hospitalprofile'
+    )
     name = models.CharField(max_length=255)
     custom_id = models.CharField(max_length=20, unique=True, blank=True)
     email = models.EmailField(unique=True)
@@ -82,15 +88,21 @@ class Hospital(models.Model):
     website = models.URLField(blank=True)
     operating_hours = models.CharField(max_length=100, blank=True)
     photo = models.ImageField(upload_to='hospital_photos/', blank=True, null=True)
-    
-    # This 'related_name' matches your migration 0002
-    admins = models.ManyToManyField(User, related_name='managed_hospitals', blank=True)
+
+    # keep admins M2M (existing migration created api_hospital_admins)
+    admins = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='managed_hospitals', blank=True)
+
+    # match the DB column you have
+    num_departments = models.IntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
         if not self.custom_id:
             self.custom_id = generate_custom_id('HOSP')
         if not self.email and self.user:
-             self.email = self.user.email # Sync email
+            self.email = self.user.email
         super().save(*args, **kwargs)
 
     def __str__(self):

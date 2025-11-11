@@ -1,111 +1,191 @@
 # api/views/patient_views.py
 
-from rest_framework import generics, permissions, views, response
-# --- 1. ADD THIS IMPORT ---
-from rest_framework.parsers import MultiPartParser, FormParser 
-from api.serializers.patient_serializers import PatientProfileSerializer, PatientDetailSerializer, SimplePrescriptionSerializer, AppointmentCancelSerializer
-from api.permissions import IsPatientUser
-from api.models import Appointment, Prescription, PatientProfile # <-- Import these
-from django.http import Http404 # <-- Import this
-
-from api.serializers.patient_serializers import (
-    PatientProfileSerializer, PatientDetailSerializer, SimplePrescriptionSerializer,
-    PublicDoctorSerializer, PublicHospitalSerializer, AppointmentCreateSerializer # <-- Add these
-)
-from api.models import (
-    Appointment, Prescription, PatientProfile, DoctorProfile, Hospital # <-- Add DoctorProfile, Hospital
-)
+from rest_framework import generics, permissions, serializers
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import SearchFilter
+from django.utils import timezone
+from django.http import Http404
 
+from django.utils import timezone
+from django.http import Http404
+from django.db import connection
+from api.permissions import IsPatientUser
+from api.models import (
+    Appointment,
+    Prescription,
+    PatientProfile,
+    Notification,
+    DoctorProfile,
+    Hospital,
+)
+from api.serializers.patient_serializers import (
+    PatientProfileSerializer,
+    PatientDetailSerializer,
+    SimplePrescriptionSerializer,
+    PublicDoctorSerializer,
+    PublicHospitalSerializer,
+    AppointmentCreateSerializer,
+    PatientDashboardSerializer,
+    AppointmentCancelSerializer,
+)
+
+
+# ---------------------------
+# Patient profile (create)
+# ---------------------------
 class PatientProfileView(generics.CreateAPIView):
     """
-    This view (which you already have) is for Step 2 registration (POST).
+    Step-2 profile completion endpoint (POST).
+    Accepts multipart/form-data (photo upload).
     """
     serializer_class = PatientProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsPatientUser]
-    
-    # --- 2. ADD THIS LINE ---
-    # This tells the view how to handle FormData and file uploads
-    parser_classes = [MultiPartParser, FormParser] 
+    parser_classes = [MultiPartParser, FormParser]
 
     def perform_create(self, serializer):
-        # We pass the user object from the request into the serializer
         serializer.save(user=self.request.user)
 
 
-# --- This is the main Patient Dashboard View ---
-class PatientDashboardDetailView(generics.RetrieveUpdateAPIView):
+# ---------------------------
+# Patient dashboard (aggregated)
+# ---------------------------
+class PatientDashboardView(APIView):
     """
-    Handles GET and PATCH requests for the logged-in patient's dashboard.
-    - GET: Retrieves all dashboard data (profile, appointments, prescriptions).
-    - PATCH: Allows the patient to update their own profile (e.g., allergies, contact_no).
+    Returns aggregated payload for the patient dashboard:
+      - profile (may be null)
+      - upcoming_appointments (next 5)
+      - recent_appointments (last 5)
+      - prescriptions
+      - notifications
+      - stats
     """
-    permission_classes = [permissions.IsAuthenticated, IsPatientUser]
-    
-    # We use PatientDetailSerializer because it's already set up
-    # to show nested user info, appointments, and medical reports.
-    serializer_class = PatientDetailSerializer 
-    
-    # --- 3. ADD PARSERS HERE TOO ---
-    # This allows the "Settings" page to also update the profile photo
-    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
 
-    def get_object(self):
-        """
-        This is the key: it retrieves the profile linked to the
-        logged-in user, not from a URL.
-        """
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        today = timezone.now().date()
+
+        # Profile (may be None)
         try:
-            return self.request.user.patientprofile
+            profile = user.patientprofile
         except PatientProfile.DoesNotExist:
-            raise Http404("Patient profile not found for this user.")
+            profile = None
 
-    def retrieve(self, request, *args, **kwargs):
+        # Helper to run a simple SQL query and return dict rows
+        def dict_fetchall(sql, params):
+            with connection.cursor() as cursor:
+                cursor.execute(sql, params)
+                cols = [c[0] for c in cursor.description]
+                return [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+        # Upcoming appointments (use the real DB column appointment_datetime)
+        upcoming_sql = """
+            SELECT id, custom_id, appointment_datetime, status, token_number,
+                   hospital_id, doctor_id
+            FROM api_appointment
+            WHERE appointment_datetime::date >= %s
+            AND patient_id = %s
+            ORDER BY appointment_datetime ASC
+            LIMIT 5
         """
-        This method is overridden to add 'prescriptions' to the
-        dashboard data.
+        upcoming_rows = dict_fetchall(upcoming_sql, [today, user.id])
+
+        # Recent appointments (before today)
+        recent_sql = """
+            SELECT id, custom_id, appointment_datetime, status, token_number,
+                   hospital_id, doctor_id
+            FROM api_appointment
+            WHERE appointment_datetime::date < %s
+            AND patient_id = %s
+            ORDER BY appointment_datetime DESC
+            LIMIT 5
         """
-        instance = self.get_object() 
-        serializer = self.get_serializer(instance)
-        data = serializer.data
+        recent_rows = dict_fetchall(recent_sql, [today, user.id])
 
-        # Manually fetch all appointments for this specific patient
-        patient_appointments = Appointment.objects.filter(patient=instance)
+        # Convert appointment_datetime to ISO strings (or split date/time if frontend expects)
+        def normalize_appointment_row(r):
+            dt = r.get('appointment_datetime')
+            if isinstance(dt, datetime.datetime):
+                r['appointment_datetime'] = dt.isoformat()
+                r['appointment_date'] = dt.date().isoformat()
+                r['appointment_time'] = dt.time().isoformat()
+            else:
+                # fallback - keep as-is
+                r['appointment_datetime'] = str(dt)
+            # Optionally resolve doctor/hospital names (try to fetch minimally)
+            try:
+                hosp = Hospital.objects.filter(id=r.get('hospital_id')).values('id','name').first()
+                r['hospital'] = hosp or None
+            except Exception:
+                r['hospital'] = None
+            try:
+                doc = DoctorProfile.objects.select_related('user').filter(user_id=r.get('doctor_id')).values('user__first_name','user__last_name','user_id').first()
+                if doc:
+                    r['doctor'] = {
+                        'id': doc.get('user_id'),
+                        'name': f"Dr. {doc.get('user__first_name') or ''} {doc.get('user__last_name') or ''}".strip()
+                    }
+                else:
+                    r['doctor'] = None
+            except Exception:
+                r['doctor'] = None
+            # Remove internal fk ids if you want
+            r.pop('hospital_id', None)
+            r.pop('doctor_id', None)
+            return r
 
-        # Fetch all prescriptions linked to those appointments
-        prescriptions = Prescription.objects.filter(
-            appointment__in=patient_appointments
-        ).select_related('medication', 'appointment__doctor__user').order_by('-appointment__created_at') 
+        upcoming_list = [normalize_appointment_row(r) for r in upcoming_rows]
+        recent_list = [normalize_appointment_row(r) for r in recent_rows]
 
-        # Serialize the prescriptions
-        prescription_serializer = SimplePrescriptionSerializer(prescriptions, many=True)
+        # Prescriptions (using ORM/serializer as before)
+        prescriptions_qs = (
+            Prescription.objects.filter(appointment__patient__user=user)
+            .select_related('medication', 'appointment__doctor__user')
+            .order_by('-created_at')[:10]
+        )
 
-        # Add the prescription data to the main response
-        data['prescriptions'] = prescription_serializer.data
+        # Notifications
+        notifications_qs = Notification.objects.filter(user=user).order_by('-created_at')[:10]
 
-        return response.Response(data)
+        stats = {
+            'total_appointments': Appointment.objects.filter(patient__user=user).count(),
+            'upcoming_appointments': len(upcoming_list),
+            'unread_notifications': Notification.objects.filter(user=user, is_read=False).count(),
+        }
+
+        payload = {
+            'profile': profile,
+            'upcoming_appointments': upcoming_list,
+            'recent_appointments': recent_list,
+            'prescriptions': prescriptions_qs,
+            'notifications': notifications_qs,
+            'stats': stats,
+        }
+
+        serializer = PatientDashboardSerializer(payload, context={'request': request})
+        return Response(serializer.data)
 
 
-# --- Booking Views ---
+# ---------------------------
+# Booking / Public lists
+# ---------------------------
 class PublicDoctorListView(generics.ListAPIView):
     """
-    Provides a public, searchable list of all doctors.
-    A patient can use this to find a doctor to book.
-    Supports search by specialization or name.
-    e.g., /api/booking/doctors/?search=cardiology
+    Searchable public list of doctors (for patients).
     """
     queryset = DoctorProfile.objects.select_related('user', 'hospital').all()
     serializer_class = PublicDoctorSerializer
-    permission_classes = [permissions.IsAuthenticated] # Any logged-in user can see doctors
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [SearchFilter]
     search_fields = ['specialization', 'user__first_name', 'user__last_name']
 
 
 class PublicHospitalListView(generics.ListAPIView):
     """
-    Provides a public, searchable list of all hospitals.
-    A patient can use this to find lab tests, etc.
-    e.g., /api/booking/hospitals/?search=apollo
+    Searchable public list of hospitals (for patients).
     """
     queryset = Hospital.objects.all()
     serializer_class = PublicHospitalSerializer
@@ -114,42 +194,39 @@ class PublicHospitalListView(generics.ListAPIView):
     search_fields = ['name', 'address']
 
 
+# ---------------------------
+# Create appointment (patient)
+# ---------------------------
 class AppointmentCreateView(generics.CreateAPIView):
     """
-    Endpoint for a logged-in patient to create (POST) a new appointment.
+    Endpoint for a logged-in patient to create an appointment.
     """
     serializer_class = AppointmentCreateSerializer
     permission_classes = [permissions.IsAuthenticated, IsPatientUser]
 
     def perform_create(self, serializer):
-        """
-        This method automatically sets the 'patient' to the logged-in user
-        and sets the 'status' to 'pending'.
-        """
         serializer.save(
             patient=self.request.user.patientprofile,
             status='pending'
         )
-        
+
+
+# ---------------------------
+# Manage appointment (cancel)
+# ---------------------------
 class PatientAppointmentManageView(generics.UpdateAPIView):
     """
-    Allow a patient to update (cancel) their own appointment.
+    Allow a patient to update/cancel their own appointment.
     """
     serializer_class = AppointmentCancelSerializer
     permission_classes = [permissions.IsAuthenticated, IsPatientUser]
 
     def get_queryset(self):
-        """
-        A patient can only manage their own appointments.
-        """
         return Appointment.objects.filter(patient=self.request.user.patientprofile)
 
     def perform_update(self, serializer):
-        """
-        When updating, only allow 'pending' or 'confirmed' appointments to be cancelled.
-        """
         appointment = self.get_object()
+        # Prevent cancelling completed appointments
         if appointment.status in ['completed']:
-            # Use DRF's built-in validation error
             raise serializers.ValidationError("Cannot cancel a completed appointment.")
         serializer.save()
