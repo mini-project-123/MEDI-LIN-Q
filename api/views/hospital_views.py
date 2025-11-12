@@ -37,7 +37,7 @@ from api.models import (
 # Helper: Get Hospital for Logged-in Admin
 def get_admin_hospital(request):
     user = request.user
-    hospital = user.hospitals_administered.first()
+    hospital = user.managed_hospitals.first()
     return hospital
 
 
@@ -155,11 +155,9 @@ class HospitalWardListView(generics.ListAPIView):
         if not hospital:
             return Ward.objects.none()
 
-        return Ward.objects.filter(hospital=hospital).annotate(
-            total_beds=Count('beds'),
-            occupied_beds=Count('beds', filter=Q(beds__is_occupied=True)),
-            available_beds=Count('beds', filter=Q(beds__is_occupied=False))
-        )
+        # Ward model already has total_beds and occupied_beds fields
+        # just filter by hospital and return
+        return Ward.objects.filter(hospital=hospital)
 
 
 # Appointment List
@@ -167,7 +165,7 @@ class HospitalAppointmentListView(generics.ListAPIView):
     serializer_class = HospitalAppointmentListSerializer
     permission_classes = [permissions.IsAuthenticated, IsHospitalAdminUser]
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    filterset_fields = {'status': ['exact'], 'appointment_date': ['date']}
+    filterset_fields = {'status': ['exact'], 'appointment_date': ['exact']}
     search_fields = [
         'patient__user__first_name', 'patient__user__last_name', 'patient__user__custom_id',
         'doctor__user__first_name', 'doctor__user__last_name'
@@ -200,7 +198,8 @@ class HospitalAnalyticsView(APIView):
         department_data = Appointment.objects.filter(hospital=hospital).values('doctor__specialization').annotate(appointment_count=Count('id')).order_by('-appointment_count')
         department_distribution = {item['doctor__specialization']: item['appointment_count'] for item in department_data if item['doctor__specialization']}
 
-        ward_data = Ward.objects.filter(hospital=hospital).annotate(total_beds=Count('beds'), occupied_beds=Count('beds', filter=Q(beds__is_occupied=True)))
+        # Ward model already has total_beds and occupied_beds as fields
+        ward_data = Ward.objects.filter(hospital=hospital)
 
         department_bed_occupancy = []
         for ward in ward_data:

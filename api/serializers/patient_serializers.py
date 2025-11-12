@@ -23,7 +23,7 @@ class PatientListSerializer(serializers.ModelSerializer):
     class Meta:
         model = PatientProfile
         fields = ['user', 'age']
-        read_only = True # This was 'read_only = True' which is not valid, fixed to read_only_fields
+        read_only_fields = ['user', 'age']
 
 
 # --- Serializers for Detail View ---
@@ -164,8 +164,16 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
 
 # --- Public Serializers for Booking ---
 class PublicHospitalSerializer(serializers.ModelSerializer):
-    # This was 'user.id' but the Hospital model has its own 'id'
-    id = serializers.IntegerField(source='id', read_only=True) 
+    photo = serializers.SerializerMethodField()
+
+    def get_photo(self, obj):
+        """Return photo URL if exists, otherwise None"""
+        if obj.photo:
+            try:
+                return self.context['request'].build_absolute_uri(obj.photo.url)
+            except:
+                return None
+        return None
 
     class Meta:
         model = Hospital

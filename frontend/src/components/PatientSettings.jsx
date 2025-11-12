@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Mail, Lock, User, Shield, Bell, Eye, EyeOff, Save, AlertCircle, Phone } from 'lucide-react'
@@ -8,16 +8,49 @@ const PatientSettings = () => {
   const { user } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
+  const [loading, setLoading] = useState(true)
   
   const [patientInfo, setPatientInfo] = useState({
     name: user?.name || 'John Patient',
     email: user?.email || 'patient@medlinq.com',
-    phone: '+1 (555) 123-4567',
-    dateOfBirth: '1990-01-01',
+    phone: '',
+    dateOfBirth: '',
     bloodGroup: 'O+',
-    emergencyContact: 'Jane Patient',
-    emergencyPhone: '+1 (555) 987-6543'
+    emergencyContact: '',
+    emergencyPhone: ''
   })
+
+  useEffect(() => {
+    fetchPatientProfile()
+  }, [])
+
+  const fetchPatientProfile = async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('accessToken')
+      const response = await fetch('http://127.0.0.1:8000/api/profile/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setPatientInfo({
+          name: data.user?.username || user?.name || 'Patient',
+          email: data.user?.email || user?.email || 'patient@medlinq.com',
+          phone: data.phone_number || '+1 (555) 123-4567',
+          dateOfBirth: data.date_of_birth || '',
+          bloodGroup: data.blood_group || 'O+',
+          emergencyContact: data.emergency_contact_name || '',
+          emergencyPhone: data.emergency_contact_phone || ''
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching patient profile:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const [security, setSecurity] = useState({
     currentPassword: '',
@@ -40,8 +73,36 @@ const PatientSettings = () => {
     healthTips: false
   })
 
-  const handleSavePatientInfo = () => {
-    alert('Patient information updated successfully!')
+  const handleSavePatientInfo = async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('accessToken')
+      const response = await fetch('http://127.0.0.1:8000/api/profile/update/', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          phone_number: patientInfo.phone,
+          date_of_birth: patientInfo.dateOfBirth,
+          blood_group: patientInfo.bloodGroup,
+          emergency_contact_name: patientInfo.emergencyContact,
+          emergency_contact_phone: patientInfo.emergencyPhone
+        })
+      })
+      
+      if (response.ok) {
+        alert('Patient information updated successfully!')
+      } else {
+        alert('Failed to update patient information')
+      }
+    } catch (error) {
+      console.error('Error updating patient info:', error)
+      alert('Error updating patient information')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleChangePassword = () => {

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext' // Import useTheme
 import { useAuth } from '../contexts/AuthContext'   // Import useAuth
 import axios from 'axios' // Import axios
-import { Calendar, Clock, User, MapPin, Phone, Filter, X, Stethoscope, AlertCircle, Loader2 } from 'lucide-react'
+import { Calendar, Clock, User, MapPin, Phone, Filter, X, Stethoscope, AlertCircle, Loader2, Plus } from 'lucide-react'
+import BookAppointmentModal from './BookAppointmentModal'
 
 // --- Helper Functions for Formatting ---
 const formatDate = (isoDate) => {
@@ -46,6 +47,7 @@ const PatientAppointments = () => {
   const [error, setError] = useState(null) // State for API errors
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterTime, setFilterTime] = useState('all')
+  const [showBookingModal, setShowBookingModal] = useState(false)
 
   // --- DATA FETCHING ---
   useEffect(() => {
@@ -188,6 +190,47 @@ const PatientAppointments = () => {
 
   return (
     <div>
+      {/* Header with Book Button */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '2rem'
+      }}>
+        <div>
+          <h2 style={{ color: theme.text, margin: '0 0 0.5rem 0' }}>My Appointments</h2>
+          <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.9rem' }}>
+            View and manage your medical appointments
+          </p>
+        </div>
+        <button
+          onClick={() => setShowBookingModal(true)}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '0.5rem',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#2563eb'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#3b82f6'
+          }}
+        >
+          <Plus size={18} />
+          Book Appointment
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="card mb-6" style={{
         backgroundColor: theme.cardBackground,
@@ -409,6 +452,20 @@ const PatientAppointments = () => {
           </div>
         )}
       </div>
+
+      {/* Book Appointment Modal */}
+      <BookAppointmentModal
+        isOpen={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
+        onSuccess={(appointmentData) => {
+          // Close modal
+          setShowBookingModal(false)
+          // Refresh appointments list
+          fetchAppointments()
+          // Show success message
+          alert('Appointment booked successfully! Please check your email for confirmation.')
+        }}
+      />
     </div>
   )
 }

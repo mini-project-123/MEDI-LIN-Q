@@ -58,7 +58,7 @@ const PatientSettingsAndPrivacy = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/patient/settings/', {
+      const response = await fetch('http://127.0.0.1:8000/api/settings/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -93,7 +93,7 @@ const PatientSettingsAndPrivacy = () => {
   // Fetch privacy settings
   const fetchPrivacy = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/patient/privacy/', {
+      const response = await fetch('http://127.0.0.1:8000/api/privacy/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -134,7 +134,7 @@ const PatientSettingsAndPrivacy = () => {
     setSuccess(false)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/patient/settings/', {
+      const response = await fetch('http://127.0.0.1:8000/api/settings/', {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -169,7 +169,7 @@ const PatientSettingsAndPrivacy = () => {
     setSuccess(false)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/patient/privacy/', {
+      const response = await fetch('http://127.0.0.1:8000/api/privacy/', {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

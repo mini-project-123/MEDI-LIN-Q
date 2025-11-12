@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react'
-import { Upload, FileText, Calendar, Search, Filter, Eye, Download, Plus } from 'lucide-react'
+import { Upload, FileText, Calendar, Search, Filter, Eye, Download, Plus, Sparkles, AlertCircle, X, Loader2 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import axios from 'axios'
 
 const PatientReports = () => {
   const { theme } = useTheme()
   const [reports, setReports] = useState([])
   const [filteredReports, setFilteredReports] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('all')
+  
+  // Summary modal state
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
+  const [selectedReport, setSelectedReport] = useState(null)
+  const [summary, setSummary] = useState(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryError, setSummaryError] = useState(null)
 
   useEffect(() => {
     fetchReports()
@@ -21,47 +30,20 @@ const PatientReports = () => {
   const fetchReports = async () => {
     try {
       setLoading(true)
+      setError(null)
       
-      // Mock reports data
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const token = localStorage.getItem('accessToken')
+      const response = await axios.get('/api/medical-reports-api/', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
       
-      const mockReports = [
-        {
-          id: 1,
-          title: 'Complete Blood Count',
-          description: 'Routine blood work checkup',
-          type: 'blood_test',
-          date: '2024-01-15',
-          file: 'blood_test_jan_2024.pdf',
-          doctor: 'Dr. Sarah Johnson',
-          hospital: 'City General Hospital'
-        },
-        {
-          id: 2,
-          title: 'Chest X-Ray',
-          description: 'Chest examination for respiratory health',
-          type: 'xray',
-          date: '2024-01-10',
-          file: 'chest_xray_jan_2024.pdf',
-          doctor: 'Dr. Michael Chen',
-          hospital: 'Metro Medical Center'
-        },
-        {
-          id: 3,
-          title: 'ECG Report',
-          description: 'Heart rhythm analysis',
-          type: 'ecg',
-          date: '2024-01-05',
-          file: 'ecg_report_jan_2024.pdf',
-          doctor: 'Dr. Sarah Johnson',
-          hospital: 'City General Hospital'
-        }
-      ]
-      
-      setReports(mockReports)
-      setFilteredReports(mockReports)
-    } catch (error) {
-      console.error('Error fetching reports:', error)
+      setReports(response.data || [])
+      setFilteredReports(response.data || [])
+    } catch (err) {
+      console.error('Error fetching reports:', err)
+      setError(err.response?.data?.detail || 'Failed to load medical reports')
+      setReports([])
+      setFilteredReports([])
     } finally {
       setLoading(false)
     }
@@ -94,6 +76,42 @@ const PatientReports = () => {
 
   const handleDownloadReport = (report) => {
     alert(`Downloading ${report.title}...`)
+  }
+
+  const handleGenerateSummary = async (report) => {
+    setSelectedReport(report)
+    setShowSummaryModal(true)
+    setSummaryLoading(true)
+    setSummaryError(null)
+    setSummary(null)
+
+    try {
+      const token = localStorage.getItem('accessToken')
+      const response = await axios.post(
+        `/api/reports/${report.id}/ai-summary/`,
+        {},
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      )
+
+      setSummary(response.data?.summary || 'Summary generated successfully')
+    } catch (err) {
+      console.error('Error generating summary:', err)
+      setSummaryError(
+        err.response?.data?.detail || 
+        'Failed to generate AI summary. Please try again.'
+      )
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
+
+  const closeSummaryModal = () => {
+    setShowSummaryModal(false)
+    setSelectedReport(null)
+    setSummary(null)
+    setSummaryError(null)
   }
 
   const getReportTypeColor = (type) => {
@@ -132,7 +150,10 @@ const PatientReports = () => {
         alignItems: 'center', 
         height: '50vh' 
       }}>
-        <div style={{ color: theme.text }}>Loading reports...</div>
+        <div style={{ textAlign: 'center', color: theme.text }}>
+          <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }} />
+          <div>Loading your medical reports...</div>
+        </div>
       </div>
     )
   }
@@ -146,6 +167,26 @@ const PatientReports = () => {
           View and download your medical reports and test results
         </p>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div style={{
+          padding: '1rem',
+          backgroundColor: '#fee2e2',
+          borderColor: '#ef4444',
+          borderRadius: '8px',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          gap: '0.75rem',
+          alignItems: 'flex-start'
+        }}>
+          <AlertCircle size={20} style={{ color: '#dc2626', flexShrink: 0, marginTop: '0.1rem' }} />
+          <div>
+            <p style={{ color: '#991b1b', margin: 0, fontWeight: '500' }}>Failed to Load Reports</p>
+            <p style={{ color: '#991b1b', margin: '0.25rem 0 0 0', fontSize: '0.9rem' }}>{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="card" style={{ 
@@ -254,10 +295,10 @@ const PatientReports = () => {
                       </div>
                       <div>
                         <h4 style={{ color: theme.text, marginBottom: '0.25rem' }}>
-                          {report.title}
+                          {report.title || 'Medical Report'}
                         </h4>
                         <p style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
-                          {report.description}
+                          {report.description || 'Medical test report'}
                         </p>
                       </div>
                     </div>
@@ -280,19 +321,19 @@ const PatientReports = () => {
                 <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
                   <div>
                     <p style={{ color: theme.textSecondary, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                      <strong>Date:</strong> {new Date(report.date).toLocaleDateString()}
+                      <strong>Date:</strong> {new Date(report.date || report.created_at).toLocaleDateString()}
                     </p>
                     <p style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
-                      <strong>Doctor:</strong> {report.doctor}
+                      <strong>Doctor:</strong> {report.doctor_name || 'N/A'}
                     </p>
                   </div>
 
                   <div>
                     <p style={{ color: theme.textSecondary, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                      <strong>Hospital:</strong> {report.hospital}
+                      <strong>Hospital:</strong> {report.hospital_name || 'N/A'}
                     </p>
                     <p style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>
-                      <strong>File:</strong> {report.file}
+                      <strong>File:</strong> {report.file_name || report.file || 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -300,6 +341,7 @@ const PatientReports = () => {
                 <div style={{ 
                   display: 'flex', 
                   gap: '0.5rem',
+                  flexWrap: 'wrap',
                   paddingTop: '1rem',
                   borderTop: `1px solid ${theme.border}`
                 }}>
@@ -319,6 +361,32 @@ const PatientReports = () => {
                     <Download size={14} style={{ marginRight: '0.25rem' }} />
                     Download
                   </button>
+                  <button 
+                    onClick={() => handleGenerateSummary(report)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#8b5cf6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#7c3aed'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#8b5cf6'
+                    }}
+                  >
+                    <Sparkles size={14} />
+                    Generate Summary
+                  </button>
                 </div>
               </div>
             ))}
@@ -335,6 +403,121 @@ const PatientReports = () => {
           </div>
         )}
       </div>
+
+      {/* AI Summary Modal */}
+      {showSummaryModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div className="card" style={{
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '85vh',
+            overflow: 'auto',
+            padding: '2rem'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ color: theme.text, margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Sparkles size={24} style={{ color: '#8b5cf6' }} />
+                  AI Summary
+                </h2>
+                <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.9rem' }}>
+                  {selectedReport?.title}
+                </p>
+              </div>
+              <button
+                onClick={closeSummaryModal}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: theme.textSecondary,
+                  padding: 0,
+                  fontSize: '1.5rem'
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Content */}
+            {summaryLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
+                <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }} />
+                <p>Generating AI summary in simple language...</p>
+              </div>
+            ) : summaryError ? (
+              <div style={{
+                padding: '1.5rem',
+                backgroundColor: '#fee2e2',
+                borderColor: '#ef4444',
+                borderRadius: '8px',
+                marginBottom: '1rem'
+              }}>
+                <p style={{ color: '#991b1b', margin: '0 0 0.5rem 0', fontWeight: '500' }}>Error Generating Summary</p>
+                <p style={{ color: '#991b1b', margin: 0, fontSize: '0.9rem' }}>{summaryError}</p>
+              </div>
+            ) : summary ? (
+              <div style={{
+                padding: '1.5rem',
+                backgroundColor: theme.cardBackground,
+                borderLeft: '4px solid #8b5cf6',
+                borderRadius: '8px',
+                marginBottom: '1.5rem'
+              }}>
+                <p style={{ color: theme.text, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                  {summary}
+                </p>
+              </div>
+            ) : null}
+
+            {/* Footer */}
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={closeSummaryModal}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: theme.cardBackground,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.background
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.cardBackground
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

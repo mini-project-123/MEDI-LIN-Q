@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import axios from 'axios' // 1. IMPORT AXIOS
+import { doctorAPI } from '../utils/api' // 1. IMPORT DOCTOR API
 import { 
   Calendar, 
   FileText, 
@@ -36,9 +36,10 @@ const DoctorSettings = () => {
   const [activeSection, setActiveSection] = useState('profile')
   const [editingField, setEditingField] = useState(null)
   
-  // 3. ADD STATE FOR LOADING AND PROFILE DATA
+  // 3. ADD STATE FOR LOADING, ERROR, AND PROFILE DATA
   const [profile, setProfile] = useState(null) 
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // This state holds the temporary values while editing
   const [tempValues, setTempValues] = useState({
@@ -62,35 +63,42 @@ const DoctorSettings = () => {
 
   const fetchProfileData = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const token = localStorage.getItem('accessToken');
-      //
-      const response = await axios.get('/api/profile/doctor/manage/', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await doctorAPI.getProfile()
+      const data = response.data
       
-      const data = response.data;
-      setProfile(data); // Save the full profile
+      // Debug log to see actual response structure
+      console.log("Doctor profile response:", data)
+      
+      setProfile(data) // Save the full profile
 
       // Pre-fill the tempValues state with real data
+      // Handle both nested (data.user.first_name) and flat (data.first_name) structures
+      const firstName = data.user?.first_name || data.first_name || 'Doctor'
+      const lastName = data.user?.last_name || data.last_name || ''
+      const email = data.user?.email || data.email || ''
+      const contactNo = data.user?.contact_no || data.contact_no || '+918799550781'
+      
       setTempValues({
-        name: `${data.user.first_name} ${data.user.last_name}`,
-        phone: data.user.contact_no || '+918799550781', // Fallback to mock
-        email: data.user.email,
+        name: `${firstName} ${lastName}`.trim(),
+        phone: contactNo,
+        email: email,
         specialization: data.specialization || '',
         license: 'MD-12345-2024', // Mock: Not in your backend model
         experience: data.experience_years || '0',
-        hospital: data.hospital?.name || 'City General Hospital', // Fallback to mock
+        hospital: data.hospital_name || data.hospital?.name || 'City General Hospital', // Fallback to mock
         department: 'Cardiology Department', // Mock: Not in your backend model
         fee: '₹500', // Mock: Not in your backend model
         hours: data.available_days || '',
         languages: data.languages_spoken || ''
-      });
+      })
       
-    } catch (error) {
-      console.error("Error fetching doctor profile for settings:", error);
+    } catch (err) {
+      console.error("Error fetching doctor profile for settings:", err)
+      setError(err.response?.data?.detail || err.message || 'Failed to load profile data')
     } finally {
-      setLoading(false); // Make sure to set loading to false
+      setLoading(false) // Make sure to set loading to false
     }
   }
 
@@ -628,7 +636,9 @@ const DoctorSettings = () => {
               color: 'white'
             }}>
               {/* 9. FIX: Check if profile exists before rendering */}
-              {profile ? profile.user.first_name.charAt(0) : (user?.name?.charAt(0) || 'A')}
+              {profile ? 
+                (profile.user?.first_name?.charAt(0) || profile.first_name?.charAt(0) || 'D') 
+                : (user?.name?.charAt(0) || 'A')}
             </div>
             <div>
               <h3 style={{ 
@@ -638,14 +648,16 @@ const DoctorSettings = () => {
                 color: theme.text || '#1e293b'
               }}>
                 {/* 10. FIX: Check if profile exists */}
-                {profile ? `${profile.user.first_name} ${profile.user.last_name}` : (user?.name || 'Aditi')}
+                {profile ? 
+                  `${profile.user?.first_name || profile.first_name || 'Doctor'} ${profile.user?.last_name || profile.last_name || ''}`.trim()
+                  : (user?.name || 'Aditi')}
               </h3>
               <p style={{ 
                 margin: 0, 
                 fontSize: '0.9rem', 
                 color: theme.textSecondary || '#64748b'
               }}>
-                {profile ? (profile.user.contact_no || '+918799550781') : '+918799550781'}
+                {profile ? (profile.user?.contact_no || profile.contact_no || '+918799550781') : '+918799550781'}
               </p>
             </div>
           </div>
@@ -681,7 +693,72 @@ const DoctorSettings = () => {
 
       {/* Settings Content */}
       <div style={{ flex: 1 }}>
-        {activeSection === 'profile' ? renderProfileSettings() : renderDefaultContent()}
+        {loading ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            minHeight: '400px'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                border: '4px solid #e2e8f0',
+                borderTop: '4px solid #3b82f6',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 1rem'
+              }} />
+              <p style={{ color: theme.textSecondary || '#64748b' }}>Loading profile data...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div style={{
+            padding: '2rem',
+            backgroundColor: '#fee2e2',
+            borderRadius: '12px',
+            border: '1px solid #fca5a5'
+          }}>
+            <h3 style={{ 
+              margin: '0 0 1rem 0',
+              color: '#991b1b',
+              fontSize: '1.1rem',
+              fontWeight: '600'
+            }}>
+              Error Loading Profile
+            </h3>
+            <p style={{ 
+              margin: '0 0 1.5rem 0',
+              color: '#7f1d1d',
+              fontSize: '0.95rem',
+              lineHeight: '1.5'
+            }}>
+              {error}
+            </p>
+            <button
+              onClick={fetchProfileData}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.95rem',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+            >
+              Try Again
+            </button>
+          </div>
+        ) : (
+          activeSection === 'profile' ? renderProfileSettings() : renderDefaultContent()
+        )}
       </div>
     </div>
   )

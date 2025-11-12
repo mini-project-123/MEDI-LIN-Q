@@ -22,7 +22,6 @@ import HospitalDoctors from '../components/HospitalDoctors'
 import HospitalAppointments from '../components/HospitalAppointments'
 import HospitalWards from '../components/HospitalWards'
 import HospitalStaff from '../components/HospitalStaff'
-import HospitalReports from '../components/HospitalReports'
 import HospitalArticles from '../components/HospitalArticles'
 import HospitalAnalytics from '../components/HospitalAnalytics'
 import HospitalSettings from '../components/HospitalSettings'
@@ -477,7 +476,6 @@ const Dashboard = () => {
                 { id: 'appointments', label: 'Appointments', icon: Calendar },
                 { id: 'wards', label: 'Wards & Beds', icon: Bed },
                 { id: 'staff', label: 'Staff', icon: Users },
-                { id: 'reports', label: 'Reports', icon: FileText },
                 { id: 'articles', label: 'Articles', icon: FileText },
                 { id: 'analytics', label: 'Analytics', icon: BarChart3 },
                 { id: 'settings', label: 'Settings & Privacy', icon: Settings }
@@ -622,7 +620,6 @@ const Dashboard = () => {
           {activeTab === 'appointments' && <HospitalAppointments />}
           {activeTab === 'wards' && <HospitalWards />}
           {activeTab === 'staff' && <HospitalStaff />}
-          {activeTab === 'reports' && <HospitalReports />}
           {activeTab === 'articles' && <HospitalArticles />}
           {activeTab === 'analytics' && <HospitalAnalytics />}
           {activeTab === 'settings' && <HospitalSettings />}

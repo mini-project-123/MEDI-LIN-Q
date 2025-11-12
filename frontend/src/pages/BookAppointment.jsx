@@ -156,13 +156,13 @@ const BookAppointment = () => {
   }
 
   const filteredHospitals = hospitals.filter(hospital =>
-    hospital.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    hospital.address.toLowerCase().includes(searchTerm.toLowerCase())
+    (hospital.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (hospital.address || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const filteredDoctors = doctors.filter(doctor =>
-    doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+    (doctor.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (doctor.specialization || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const renderStepIndicator = () => (

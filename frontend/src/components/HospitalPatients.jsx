@@ -3,6 +3,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext' // Import useAuth
 import axios from 'axios' // Import axios
 import { Users, Calendar, Stethoscope, X, Plus, Filter, FileText, Activity, Search, Phone } from 'lucide-react'
+import PatientReportsModal from './PatientReportsModal'
 
 const HospitalPatients = () => {
   const { theme } = useTheme()
@@ -16,6 +17,7 @@ const HospitalPatients = () => {
   // --- STATE FOR MODALS AND FILTERS ---
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showReportsModal, setShowReportsModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   
   // (Note: The filter dropdown from the mock file has been removed for now,
@@ -234,6 +236,41 @@ const HospitalPatients = () => {
                     </span>
                   </div> */}
                 </div>
+
+                {/* View Reports Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation() // Prevent triggering the card click
+                    setSelectedPatient(patient)
+                    setShowReportsModal(true)
+                  }}
+                  style={{
+                    width: '100%',
+                    marginTop: '1rem',
+                    padding: '0.75rem',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#2563eb'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3b82f6'
+                  }}
+                >
+                  <FileText size={16} />
+                  View Reports
+                </button>
               </div>
             )
           }) : (
@@ -331,10 +368,34 @@ const HospitalPatients = () => {
 
             {/* Reports (Mock) */}
             <div>
-              <h3 style={{ color: theme.text, margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={20} />
-                Medical Reports
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ color: theme.text, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileText size={20} />
+                  Medical Reports
+                </h3>
+                <button
+                  onClick={() => setShowReportsModal(true)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: '500',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#2563eb'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3b82f6'
+                  }}
+                >
+                  View All Reports
+                </button>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {patientHistory.reports.map((report, index) => (
                   <div key={index} style={{
@@ -540,6 +601,13 @@ const HospitalPatients = () => {
           </div>
         </div>
       )}
+
+      {/* Patient Reports Modal */}
+      <PatientReportsModal 
+        isOpen={showReportsModal} 
+        patient={selectedPatient}
+        onClose={() => setShowReportsModal(false)}
+      />
     </div>
   )
 }

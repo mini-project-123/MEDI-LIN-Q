@@ -52,14 +52,16 @@ class HospitalStaffListSerializer(serializers.ModelSerializer):
 
 # ------------------------------ Hospital Ward Serializer ------------------------------
 class HospitalWardSerializer(serializers.ModelSerializer):
-    total_beds = serializers.IntegerField(read_only=True)
-    occupied_beds = serializers.IntegerField(read_only=True)
-    available_beds = serializers.IntegerField(read_only=True)
+    available_beds = serializers.SerializerMethodField()
     occupancy_rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Ward
         fields = ['id', 'name', 'total_beds', 'occupied_beds', 'available_beds', 'occupancy_rate']
+        read_only_fields = ['id', 'name', 'total_beds', 'occupied_beds', 'available_beds', 'occupancy_rate']
+
+    def get_available_beds(self, obj):
+        return obj.available_beds
 
     def get_occupancy_rate(self, obj):
         if obj.total_beds > 0:
@@ -83,7 +85,7 @@ class HospitalAppointmentListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Appointment
-        fields = ['id', 'custom_id', 'patient', 'doctor', 'appointment_datetime', 'status', 'token_number']
+        fields = ['id', 'custom_id', 'patient', 'doctor', 'appointment_date', 'appointment_time', 'status', 'token_number']
         read_only_fields = fields
 
 
