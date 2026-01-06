@@ -68,8 +68,8 @@ class NextAppointmentSerializer(serializers.ModelSerializer):
     patient = SimplePatientProfileSerializer(read_only=True)
     class Meta:
         model = Appointment
-        fields = ['id', 'patient', 'appointment_datetime']
-        read_only = True
+        fields = ['id', 'patient', 'appointment_date', 'appointment_time']
+        read_only_fields = ['id', 'patient', 'appointment_date', 'appointment_time']
 
 # --- 6. "MY APPOINTMENTS" PAGE SERIALIZER ---
 # (These are unchanged)
@@ -82,8 +82,9 @@ class DoctorAppointmentSerializer(serializers.ModelSerializer):
             'id',
             'custom_id',
             'patient',
-            'appointment_datetime',
+            'appointment_date',
+            'appointment_time',
             'status',
             'token_number'
         ]
-        read_only = True
+        read_only_fields = ['id', 'custom_id', 'patient', 'appointment_date', 'appointment_time', 'status', 'token_number']

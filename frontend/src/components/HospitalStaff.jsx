@@ -102,12 +102,13 @@ const HospitalStaff = () => {
       email: newStaff.email,
       contact_no: newStaff.phone,
       job_title: newStaff.jobTitle,
+      gender: 'Male',
       password: newStaff.password
     }
 
     try {
       const token = localStorage.getItem('accessToken')
-      await axios.post('/api/hospital/staff/', payload, {
+      await axios.post('/api/hospital/staff/add/', payload, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -159,6 +160,28 @@ const HospitalStaff = () => {
     setNewStaff({ // Reset form
       firstName: '', lastName: '', email: '', phone: '', jobTitle: 'Nurse', password: ''
     })
+  }
+
+  // Delete staff handler
+  const handleDeleteStaff = async (staffId) => {
+    if (!window.confirm('Are you sure you want to delete this staff member?')) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('accessToken')
+      await axios.delete(`/api/hospital/staff/${staffId}/manage/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      alert('Staff member deleted successfully!')
+      loadStaff(searchTerm)
+    } catch (err) {
+      console.error('Error deleting staff:', err)
+      alert('Failed to delete staff member. ' + (err.response?.data?.detail || ''))
+    }
   }
 
   // --- RENDER FUNCTIONS ---
@@ -283,6 +306,31 @@ const HospitalStaff = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Delete Button */}
+                <button
+                  onClick={() => handleDeleteStaff(member.user.id)}
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#fee2e2',
+                    color: '#dc2626',
+                    border: '1px solid #fca5a5',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: '500',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#fecaca'
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = '#fee2e2'
+                  }}
+                >
+                  Delete Staff
+                </button>
               </div>
             )
           }) : (

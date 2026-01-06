@@ -117,15 +117,27 @@ class PatientDetailSerializer(serializers.ModelSerializer):
 
 # --- Serializer for Step-2 Profile Completion ---
 class PatientProfileSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+    
     class Meta:
         model = PatientProfile
         fields = [
+            'user',
             'blood_group',
             'emergency_contact_no',
             'emergency_contact_relation',
             'allergies',
             'photo'
         ]
+    
+    def get_user(self, obj):
+        return {
+            'username': obj.user.username,
+            'first_name': obj.user.first_name,
+            'last_name': obj.user.last_name,
+            'email': obj.user.email,
+            'contact_no': obj.user.contact_no
+        }
 
     def create(self, validated_data):
         # 'user' is passed from the view's perform_create method
@@ -170,7 +182,11 @@ class PublicHospitalSerializer(serializers.ModelSerializer):
         """Return photo URL if exists, otherwise None"""
         if obj.photo:
             try:
-                return self.context['request'].build_absolute_uri(obj.photo.url)
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.photo.url)
+                else:
+                    return obj.photo.url
             except:
                 return None
         return None

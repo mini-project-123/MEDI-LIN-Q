@@ -28,21 +28,22 @@ const PatientSettings = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('accessToken')
-      const response = await fetch('http://127.0.0.1:8000/api/profile/', {
+      const response = await fetch('http://127.0.0.1:8000/api/profile/update/', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
       if (response.ok) {
         const data = await response.json()
+        const fullName = `${data.user?.first_name || ''} ${data.user?.last_name || ''}`.trim()
         setPatientInfo({
-          name: data.user?.username || user?.name || 'Patient',
-          email: data.user?.email || user?.email || 'patient@medlinq.com',
-          phone: data.phone_number || '+1 (555) 123-4567',
-          dateOfBirth: data.date_of_birth || '',
+          name: fullName || data.user?.username || 'Patient',
+          email: data.user?.email || 'patient@medlinq.com',
+          phone: data.user?.contact_no || '',
+          dateOfBirth: '',
           bloodGroup: data.blood_group || 'O+',
-          emergencyContact: data.emergency_contact_name || '',
-          emergencyPhone: data.emergency_contact_phone || ''
+          emergencyContact: data.emergency_contact_no || '',
+          emergencyPhone: data.emergency_contact_relation || ''
         })
       }
     } catch (error) {
@@ -78,24 +79,24 @@ const PatientSettings = () => {
     try {
       const token = localStorage.getItem('accessToken')
       const response = await fetch('http://127.0.0.1:8000/api/profile/update/', {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          phone_number: patientInfo.phone,
-          date_of_birth: patientInfo.dateOfBirth,
           blood_group: patientInfo.bloodGroup,
-          emergency_contact_name: patientInfo.emergencyContact,
-          emergency_contact_phone: patientInfo.emergencyPhone
+          emergency_contact_no: patientInfo.emergencyContact,
+          emergency_contact_relation: patientInfo.emergencyPhone,
+          allergies: ''
         })
       })
       
       if (response.ok) {
         alert('Patient information updated successfully!')
       } else {
-        alert('Failed to update patient information')
+        const error = await response.json()
+        alert(`Failed to update patient information: ${JSON.stringify(error)}`)
       }
     } catch (error) {
       console.error('Error updating patient info:', error)
@@ -153,11 +154,11 @@ const PatientSettings = () => {
             fontSize: '2rem',
             fontWeight: 'bold'
           }}>
-            {user?.name?.charAt(0) || 'P'}
+            {patientInfo?.name?.charAt(0) || 'P'}
           </div>
           <div>
-            <h2 style={{ color: theme.text, margin: '0 0 0.5rem 0' }}>{user?.name || 'Patient Name'}</h2>
-            <p style={{ color: theme.textSecondary, margin: 0 }}>{user?.email || 'patient@medlinq.com'}</p>
+            <h2 style={{ color: theme.text, margin: '0 0 0.5rem 0' }}>{patientInfo?.name || 'Patient Name'}</h2>
+            <p style={{ color: theme.textSecondary, margin: 0 }}>{patientInfo?.email || 'patient@medlinq.com'}</p>
             <p style={{ color: theme.textSecondary, margin: '0.25rem 0 0 0', fontSize: '0.9rem' }}>
               Role: Patient • Member since {new Date().getFullYear()}
             </p>

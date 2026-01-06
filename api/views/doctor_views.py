@@ -161,6 +161,9 @@ class DoctorPatientListView(generics.ListAPIView):
                 queryset = queryset.filter(appointments__appointment_date=specific_date).distinct()
             except ValueError:
                 pass
+        consultation_type = self.request.query_params.get('consultation_type', None)
+        if consultation_type:
+            queryset = queryset.filter(appointments__appointment_type=consultation_type).distinct()
         queryset = queryset.order_by('user__last_name', 'user__first_name')
         return queryset
 

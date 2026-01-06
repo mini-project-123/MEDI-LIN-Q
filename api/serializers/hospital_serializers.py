@@ -27,6 +27,13 @@ class HospitalSerializer(serializers.ModelSerializer):
             'name', 'address', 'contact_no1', 'contact_no2', 'email', 'website',
             'license_no', 'operating_hours', 'num_departments', 'photo'
         ]
+    
+    def create(self, validated_data):
+        user = self.context['request'].user if self.context.get('request') else None
+        if not user:
+            raise serializers.ValidationError('User context is required for hospital creation.')
+        hospital = Hospital.objects.create(user=user, **validated_data)
+        return hospital
 
 
 # ------------------------------ Hospital Doctor List ------------------------------
@@ -121,7 +128,7 @@ class StaffCreateSerializer(serializers.Serializer):
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
     contact_no = serializers.CharField(required=False)
-    gender = serializers.CharField(required=False)
+    gender = serializers.CharField(required=False, default='Male')
     date_of_birth = serializers.DateField(required=False)
     job_title = serializers.CharField(required=True)
 
@@ -140,7 +147,7 @@ class StaffCreateSerializer(serializers.Serializer):
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
             contact_no=validated_data.get('contact_no'),
-            gender=validated_data.get('gender'),
+            gender=validated_data.get('gender', 'Male'),
             date_of_birth=validated_data.get('date_of_birth'),
             role='staff'
         )
@@ -158,32 +165,41 @@ class PatientCreateSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, required=True)
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
-    contact_no = serializers.CharField(required=False)
-    gender = serializers.CharField(required=False)
+    contact_no = serializers.CharField(required=False, allow_blank=True)
+    gender = serializers.CharField(required=False, default='Male')
     date_of_birth = serializers.DateField(required=False)
-    blood_group = serializers.CharField(required=False)
-    allergies = serializers.CharField(required=False)
+    blood_group = serializers.CharField(required=False, allow_blank=True)
+    allergies = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate_email(self, value):
+        """Check if email already exists"""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
 
     @transaction.atomic
     def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data['email'],
-            email=validated_data['email'],
-            password=validated_data['password'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            contact_no=validated_data.get('contact_no'),
-            gender=validated_data.get('gender'),
-            date_of_birth=validated_data.get('date_of_birth'),
-            role='patient'
-        )
+        try:
+            user = User.objects.create_user(
+                username=validated_data['email'],
+                email=validated_data['email'],
+                password=validated_data['password'],
+                first_name=validated_data['first_name'],
+                last_name=validated_data['last_name'],
+                contact_no=validated_data.get('contact_no'),
+                gender=validated_data.get('gender', 'Male'),
+                date_of_birth=validated_data.get('date_of_birth'),
+                role='patient'
+            )
 
-        patient_profile = PatientProfile.objects.create(
-            user=user,
-            blood_group=validated_data.get('blood_group'),
-            allergies=validated_data.get('allergies')
-        )
-        return patient_profile
+            patient_profile = PatientProfile.objects.create(
+                user=user,
+                blood_group=validated_data.get('blood_group'),
+                allergies=validated_data.get('allergies')
+            )
+            return patient_profile
+        except Exception as e:
+            raise serializers.ValidationError(f"Error creating patient: {str(e)}")
 
 
 # ------------------------------ Patient Detail (GET/PATCH/DELETE) ------------------------------

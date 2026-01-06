@@ -24,7 +24,12 @@ const HospitalAnalytics = () => {
   const [analyticsData, setAnalyticsData] = useState({
     // FIX: Initialize as an empty array of objects
     departmentVisits: [], 
-    departmentDistribution: []
+    departmentDistribution: [],
+    monthlyVisits: {},
+    bedOccupancy: [],
+    totalAppointments: 0,
+    avgDailyVisits: 0,
+    totalBedOccupancy: 0
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -69,9 +74,25 @@ const HospitalAnalytics = () => {
           }
         });
 
+        // 3. Calculate summary statistics
+        const monthlyValues = Object.values(data.monthly_visits);
+        const totalAppts = monthlyValues.reduce((sum, count) => sum + count, 0);
+        const avgDailyVisits = monthlyValues.length > 0 ? Math.round(totalAppts / (monthlyValues.length * 30)) : 0;
+        
+        // 4. Calculate bed occupancy
+        const bedData = data.department_bed_occupancy;
+        const totalBeds = bedData.reduce((sum, ward) => sum + ward.total_beds, 0);
+        const totalOccupied = bedData.reduce((sum, ward) => sum + ward.occupied_beds, 0);
+        const avgBedOccupancy = totalBeds > 0 ? Math.round((totalOccupied / totalBeds) * 100) : 0;
+
         setAnalyticsData({
           departmentVisits: transformedDeptVisits,
-          departmentDistribution: transformedDeptDistribution
+          departmentDistribution: transformedDeptDistribution,
+          monthlyVisits: data.monthly_visits,
+          bedOccupancy: bedData,
+          totalAppointments: totalAppts,
+          avgDailyVisits: avgDailyVisits,
+          totalBedOccupancy: avgBedOccupancy
         });
 
       } catch (err) {
@@ -120,7 +141,7 @@ const HospitalAnalytics = () => {
         <p style={{ color: theme.textSecondary, margin: 0 }}>Hospital performance metrics and insights</p>
       </div>
 
-      {/* Summary Stats (Still Mock, as API doesn't provide them here) */}
+      {/* Summary Stats (Now using real API data) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -136,8 +157,8 @@ const HospitalAnalytics = () => {
               <Users size={24} style={{ color: '#3b82f6' }} />
             </div>
             <div>
-              <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>Total Patients</p>
-              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>2,847</h3>
+              <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>Total Appointments</p>
+              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>{analyticsData.totalAppointments.toLocaleString()}</h3>
             </div>
           </div>
         </div>
@@ -157,7 +178,7 @@ const HospitalAnalytics = () => {
             </div>
             <div>
               <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>Avg Daily Visits</p>
-              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>156</h3>
+              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>{analyticsData.avgDailyVisits}</h3>
             </div>
           </div>
         </div>
@@ -176,8 +197,8 @@ const HospitalAnalytics = () => {
               <TrendingUp size={24} style={{ color: '#f59e0b' }} />
             </div>
             <div>
-              <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>Growth Rate</p>
-              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>+12.5%</h3>
+              <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>Total Departments</p>
+              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>{analyticsData.departmentDistribution.length}</h3>
             </div>
           </div>
         </div>
@@ -197,7 +218,7 @@ const HospitalAnalytics = () => {
             </div>
             <div>
               <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>Bed Occupancy</p>
-              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>78.5%</h3>
+              <h3 style={{ color: theme.text, margin: '0.25rem 0 0 0', fontSize: '1.5rem' }}>{analyticsData.totalBedOccupancy}%</h3>
             </div>
           </div>
         </div>

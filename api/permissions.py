@@ -30,3 +30,13 @@ class IsHospitalAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
         # This rule checks if the user is logged in AND their role is 'hospital_admin'.
         return request.user and request.user.is_authenticated and request.user.role == 'hospital_admin'
+
+
+class IsDoctorOrHospitalAdmin(permissions.BasePermission):
+    """
+    Custom permission to allow users with 'doctor' or 'hospital_admin' role.
+    """
+    def has_permission(self, request, view):
+        # Allow both doctors and hospital admins to create/manage articles
+        return (request.user and request.user.is_authenticated and 
+                (request.user.role == 'doctor' or request.user.role == 'hospital_admin'))

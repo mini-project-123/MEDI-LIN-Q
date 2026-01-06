@@ -22,7 +22,7 @@ const HospitalDoctors = () => {
     name: '',
     specialty: '',
     phone: '',
-    email: '',
+    email: ''
   })
 
   // --- DATA FETCHING ---
@@ -47,7 +47,10 @@ const HospitalDoctors = () => {
           params: params
         })
         
-        setDoctors(response.data) // Save the doctor list
+        // Handle both paginated and non-paginated responses
+        const data = response.data
+        const doctorList = Array.isArray(data) ? data : (data.results || data || [])
+        setDoctors(doctorList) // Save the doctor list
 
       } catch (err) {
         console.error('Error fetching doctors:', err)
@@ -73,13 +76,27 @@ const HospitalDoctors = () => {
   }, [searchTerm, logout]) // Re-run effect if searchTerm or logout changes
 
   
-  // --- MODAL & FORM HANDLERS (Mocked for now) ---
+  // --- MODAL & FORM HANDLERS ---
   
-  const handleAddDoctor = () => {
-    // We will wire this up in a future step
-    alert(`(Mock) Doctor ${newDoctor.name} added successfully!`)
-    setShowAddModal(false)
-    setNewDoctor({ name: '', specialty: '', phone: '', email: '' })
+  const handleAddDoctor = async () => {
+    if (!newDoctor.name || !newDoctor.specialty || !newDoctor.email) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('accessToken')
+      
+      // TODO: Implement doctor creation API endpoint
+      console.log('Add doctor:', newDoctor)
+      
+      // Reset form
+      setNewDoctor({ name: '', specialty: '', phone: '', email: '' })
+      setShowAddModal(false)
+    } catch (err) {
+      console.error('Error adding doctor:', err)
+      alert('Failed to add doctor')
+    }
   }
   
   // Mock data for modal (will be replaced later)
@@ -386,7 +403,7 @@ const HospitalDoctors = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div>
                 <label style={{ display: 'block', color: theme.text, marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '500' }}>
-                  Doctor Name
+                  Doctor Name *
                 </label>
                 <input
                   type="text"
@@ -407,34 +424,13 @@ const HospitalDoctors = () => {
 
               <div>
                 <label style={{ display: 'block', color: theme.text, marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '500' }}>
-                  Specialty
+                  Specialty *
                 </label>
                 <input
                   type="text"
                   value={newDoctor.specialty}
                   onChange={(e) => setNewDoctor({ ...newDoctor, specialty: e.target.value })}
                   placeholder="e.g., Cardiology"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: `1px solid ${theme.border || '#e5e7eb'}`,
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    backgroundColor: theme.cardBackground,
-                    color: theme.text
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', color: theme.text, marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '500' }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={newDoctor.email}
-                  onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
-                  placeholder="Enter email address"
                   style={{
                     width: '100%',
                     padding: '0.75rem',
@@ -468,9 +464,33 @@ const HospitalDoctors = () => {
                 />
               </div>
 
+              <div>
+                <label style={{ display: 'block', color: theme.text, marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '500' }}>
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  value={newDoctor.email}
+                  onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
+                  placeholder="Enter email address"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${theme.border || '#e5e7eb'}`,
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    backgroundColor: theme.cardBackground,
+                    color: theme.text
+                  }}
+                />
+              </div>
+
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false)
+                    setAddError(null)
+                  }}
                   style={{
                     flex: 1,
                     padding: '0.75rem',
@@ -486,19 +506,20 @@ const HospitalDoctors = () => {
                 </button>
                 <button
                   onClick={handleAddDoctor}
+                  disabled={addingDoctor}
                   style={{
                     flex: 1,
                     padding: '0.75rem',
-                    backgroundColor: '#3b82f6',
+                    backgroundColor: addingDoctor ? '#9ca3af' : '#3b82f6',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',
-                    cursor: 'pointer',
+                    cursor: addingDoctor ? 'not-allowed' : 'pointer',
                     fontSize: '1rem',
                     fontWeight: '500'
                   }}
                 >
-                  Add Doctor
+                  {addingDoctor ? 'Adding...' : 'Add Doctor'}
                 </button>
               </div>
             </div>

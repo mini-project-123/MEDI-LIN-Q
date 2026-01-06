@@ -152,6 +152,7 @@ class Appointment(models.Model):
     appointment_date = models.DateField(null=True, blank=True)
     appointment_time = models.TimeField(null=True, blank=True)
     appointment_type = models.CharField(max_length=20, choices=APPOINTMENT_TYPES, default='consultation')
+    reason = models.TextField(blank=True)  # Reason for appointment
     
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     token_number = models.PositiveIntegerField(null=True, blank=True)
@@ -166,6 +167,33 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f"Appointment {self.custom_id} for {self.patient.user.username}"
+
+
+class TimeSlot(models.Model):
+    """Time slot availability for doctors"""
+    DAY_CHOICES = (
+        ('Monday', 'Monday'),
+        ('Tuesday', 'Tuesday'),
+        ('Wednesday', 'Wednesday'),
+        ('Thursday', 'Thursday'),
+        ('Friday', 'Friday'),
+        ('Saturday', 'Saturday'),
+        ('Sunday', 'Sunday'),
+    )
+    
+    id = models.AutoField(primary_key=True)
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='time_slots')
+    day = models.CharField(max_length=20, choices=DAY_CHOICES)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_available = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('doctor', 'day', 'start_time')
+    
+    def __str__(self):
+        return f"{self.doctor.user.username} - {self.day} {self.start_time}-{self.end_time}"
 
 
 class MedicalReport(models.Model):

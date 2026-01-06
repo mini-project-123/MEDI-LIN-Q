@@ -36,8 +36,10 @@ const DoctorPatients = () => {
       if (filters.visited) {
         params.append('visited', filters.visited)
       }
+      if (filters.consultationType) {
+        params.append('consultation_type', filters.consultationType)
+      }
       
-      //
       const response = await axios.get('/api/doctor/patients/', {
         headers: { 'Authorization': `Bearer ${token}` },
         params: params
@@ -175,12 +177,11 @@ const DoctorPatients = () => {
             value={filters.consultationType}
             onChange={(e) => handleFilterChange('consultationType', e.target.value)}
             className="form-input"
-            // 10. This filter is not in the backend view, so we'll disable it for now
-            disabled={true} 
           >
-            <option value="">All Types (Not Implemented)</option>
-            <option value="general">General Checkup</option>
+            <option value="">All Types</option>
+            <option value="consultation">Consultation</option>
             <option value="follow_up">Follow-up</option>
+            <option value="procedure">Procedure</option>
           </select>
         </div>
       </div>

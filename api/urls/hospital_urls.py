@@ -15,7 +15,8 @@ from api.views.hospital_views import (
     HospitalStaffManageView,
     HospitalPatientCreateView,
     HospitalPatientManageView,
-    HospitalPatientReportUploadView
+    HospitalPatientReportUploadView,
+    HospitalPatientHistoryView
 )
 
 urlpatterns = [
@@ -35,6 +36,7 @@ urlpatterns = [
     path('hospital/patients/', HospitalPatientListView.as_view(), name='hospital-patient-list'),
     path('hospital/patients/add/', HospitalPatientCreateView.as_view(), name='hospital-patient-add'),
     path('hospital/patients/<int:pk>/manage/', HospitalPatientManageView.as_view(), name='hospital-patient-manage'),
+    path('hospital/patients/<int:pk>/history/', HospitalPatientHistoryView.as_view(), name='hospital-patient-history'),
     path('hospital/patients/<int:pk>/upload-report/', HospitalPatientReportUploadView.as_view(), name='hospital-patient-upload-report'),
     
     # Hospital structure data

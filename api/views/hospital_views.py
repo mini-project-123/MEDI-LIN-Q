@@ -142,7 +142,9 @@ class HospitalPatientListView(generics.ListAPIView):
         hospital = get_admin_hospital(self.request)
         if not hospital:
             return PatientProfile.objects.none()
-        return PatientProfile.objects.filter(appointments__hospital=hospital).select_related('user').distinct()
+        # Show all patients - they can be managed by hospital
+        # (In a real system, you'd want to track which hospital owns each patient)
+        return PatientProfile.objects.select_related('user').prefetch_related('appointments')
 
 
 # Ward List
@@ -269,7 +271,10 @@ class HospitalPatientManageView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        return PatientProfile.objects.all().prefetch_related('appointments__doctor__user', 'medical_reports')
+        hospital = get_admin_hospital(self.request)
+        if not hospital:
+            return PatientProfile.objects.none()
+        return PatientProfile.objects.filter(appointments__hospital=hospital).select_related('user').prefetch_related('appointments__doctor__user', 'medical_reports').distinct()
 
 
 # Upload Medical Report
@@ -285,3 +290,35 @@ class HospitalPatientReportUploadView(generics.CreateAPIView):
         except PatientProfile.DoesNotExist:
             raise serializers.ValidationError("Patient not found.")
         serializer.save(patient=patient_profile)
+
+
+# Get Patient History (Appointments & Medical Reports)
+class HospitalPatientHistoryView(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsHospitalAdminUser]
+    lookup_field = 'pk'
+
+    def get_object(self):
+        patient_user_id = self.kwargs.get('pk')
+        try:
+            patient_profile = PatientProfile.objects.get(user_id=patient_user_id)
+            return patient_profile
+        except PatientProfile.DoesNotExist:
+            return None
+
+    def retrieve(self, request, *args, **kwargs):
+        patient = self.get_object()
+        if not patient:
+            return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get all appointments for this patient
+        appointments = Appointment.objects.filter(patient=patient).select_related('doctor__user').order_by('-appointment_date')
+        appointments_serializer = HospitalAppointmentListSerializer(appointments, many=True)
+
+        # Get all medical reports for this patient
+        reports = MedicalReport.objects.filter(patient=patient).order_by('-created_at')
+        reports_serializer = HospitalMedicalReportSerializer(reports, many=True)
+
+        return Response({
+            'appointments': appointments_serializer.data,
+            'medical_reports': reports_serializer.data
+        }, status=status.HTTP_200_OK)

@@ -116,9 +116,24 @@ const Articles = () => {
     }
   }
 
-  // 7. This function is no longer needed as the backend doesn't have a DELETE endpoint.
+  // 7. UPDATED: Delete functionality with backend API call
   const deleteArticle = async (articleId) => {
-    alert("Delete functionality is not implemented in the backend yet.")
+    if (!window.confirm('Are you sure you want to delete this article?')) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('accessToken')
+      await axios.delete(`/api/articles/${articleId}/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      alert('Article deleted successfully!')
+      fetchArticles() // Refresh the article list
+    } catch (error) {
+      console.error('Error deleting article:', error)
+      alert('Failed to delete article. You can only delete your own articles.')
+    }
   }
 
   const handleLike = (articleId) => {
@@ -267,7 +282,31 @@ const Articles = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {/* 16. Removed Edit and Delete buttons */}
+            {/* Show delete button if user is the article author */}
+            {user && user.role === 'doctor' && article.author.user?.id === user.id && (
+              <button
+                onClick={() => deleteArticle(article.id)}
+                style={{
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  border: '1px solid #fca5a5',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fecaca'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            )}
             
             <button 
               className="btn btn-primary" 
@@ -318,8 +357,8 @@ const Articles = () => {
             Discover insights from healthcare professionals
           </p>
         </div>
-        {/* 17. Only show "Write Article" button if user is a doctor */}
-        {user && user.role === 'doctor' && (
+        {/* 17. Show "Write Article" button if user is a doctor or hospital admin */}
+        {user && (user.role === 'doctor' || user.role === 'hospital_admin') && (
           <button 
             onClick={() => setShowCreateForm(true)}
             className="btn btn-primary"
@@ -448,7 +487,7 @@ const Articles = () => {
                 : 'Check back later for new articles from our doctors.'
               }
             </p>
-            {user.role === 'doctor' && (
+            {user && (user.role === 'doctor' || user.role === 'hospital_admin') && (
               <button 
                 onClick={() => setShowCreateForm(true)}
                 className="btn btn-primary"

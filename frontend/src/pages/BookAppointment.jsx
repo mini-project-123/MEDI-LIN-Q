@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Calendar, Clock, Building2, User, Search, MapPin } from 'lucide-react'
 
 const BookAppointment = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [hospitals, setHospitals] = useState([])
   const [doctors, setDoctors] = useState([])
@@ -46,7 +48,7 @@ const BookAppointment = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('accessToken')
-      const response = await fetch(`http://127.0.0.1:8000/api/booking/doctors/?hospital=${hospitalId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/booking/hospitals/${hospitalId}/doctors/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -62,15 +64,38 @@ const BookAppointment = () => {
 
   const fetchAvailableSlots = async (doctorId, date) => {
     setLoading(true)
-    // Mock time slots
-    const mockSlots = [
-      '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM',
-      '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'
-    ]
-    setTimeout(() => {
-      setAvailableSlots(mockSlots)
+    try {
+      const token = localStorage.getItem('accessToken')
+      // Find the doctor object that was already fetched
+      const selectedDoctor = doctors.find(d => d.doctor_id === doctorId)
+      
+      if (selectedDoctor && selectedDoctor.time_slots) {
+        // Get the day of week for the selected date
+        const selectedDate = new Date(date)
+        const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' })
+        
+        // Filter time slots for the selected day that are available
+        const daySlots = selectedDoctor.time_slots.filter(slot => 
+          slot.day === dayOfWeek && slot.is_available
+        )
+        
+        // Convert time slots to formatted display
+        const formattedSlots = daySlots.map(slot => ({
+          time: slot.start_time.substring(0, 5),
+          available: slot.is_available,
+          slotId: slot.id
+        }))
+        
+        setAvailableSlots(formattedSlots)
+      } else {
+        setAvailableSlots([])
+      }
+    } catch (error) {
+      console.error('Error fetching available slots:', error)
+      setAvailableSlots([])
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   const handleHospitalSelect = (hospitalId) => {
@@ -102,27 +127,17 @@ const BookAppointment = () => {
     try {
       const token = localStorage.getItem('accessToken')
       
-      // Convert time slot to 24-hour format
-      const timeSlot24 = bookingData.timeSlot.replace(/AM|PM/, '').trim()
-      const [hours, minutes] = timeSlot24.split(':')
-      let hour = parseInt(hours)
-      if (bookingData.timeSlot.includes('PM') && hour !== 12) {
-        hour += 12
-      } else if (bookingData.timeSlot.includes('AM') && hour === 12) {
-        hour = 0
-      }
-      const formattedTime = `${hour.toString().padStart(2, '0')}:${minutes}`
-      
+      // Time slot is already in HH:MM format from the API
       const appointmentData = {
-        doctor: parseInt(bookingData.doctorId),
-        hospital: parseInt(bookingData.hospitalId),
+        doctor_id: parseInt(bookingData.doctorId),
+        hospital_id: parseInt(bookingData.hospitalId),
         appointment_date: bookingData.date,
-        appointment_time: formattedTime,
-        appointment_type: bookingData.reason || 'consultation',
-        notes: bookingData.notes
+        appointment_time: bookingData.timeSlot,
+        appointment_type: 'consultation',
+        reason: bookingData.reason
       }
       
-      const response = await fetch('http://127.0.0.1:8000/api/booking/create/', {
+      const response = await fetch('http://127.0.0.1:8000/api/booking/appointments/book/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -143,6 +158,7 @@ const BookAppointment = () => {
           notes: ''
         })
         setStep(1)
+        navigate('/dashboard')
       } else {
         const errorData = await response.json()
         alert(`Failed to book appointment: ${JSON.stringify(errorData)}`)
@@ -160,10 +176,11 @@ const BookAppointment = () => {
     (hospital.address || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const filteredDoctors = doctors.filter(doctor =>
-    (doctor.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (doctor.specialization || '').toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredDoctors = doctors.filter(doctor => {
+    const fullName = `${doctor.user?.first_name || ''} ${doctor.user?.last_name || ''}`.toLowerCase()
+    return fullName.includes(searchTerm.toLowerCase()) ||
+      (doctor.specialization || '').toLowerCase().includes(searchTerm.toLowerCase())
+  })
 
   const renderStepIndicator = () => (
     <div style={{ 
@@ -234,12 +251,12 @@ const BookAppointment = () => {
               backgroundColor: 'white'
             }}
             onMouseEnter={(e) => {
-              e.target.style.borderColor = '#3b82f6'
-              e.target.style.backgroundColor = '#f8fafc'
+              e.currentTarget.style.borderColor = '#3b82f6'
+              e.currentTarget.style.backgroundColor = '#f8fafc'
             }}
             onMouseLeave={(e) => {
-              e.target.style.borderColor = '#e5e7eb'
-              e.target.style.backgroundColor = 'white'
+              e.currentTarget.style.borderColor = '#e5e7eb'
+              e.currentTarget.style.backgroundColor = 'white'
             }}
           >
             <h4 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>{hospital.name}</h4>
@@ -286,8 +303,8 @@ const BookAppointment = () => {
       <div className="grid grid-2" style={{ gap: '1rem' }}>
         {filteredDoctors.map((doctor) => (
           <div
-            key={doctor.id}
-            onClick={() => handleDoctorSelect(doctor.id)}
+            key={doctor.doctor_id}
+            onClick={() => handleDoctorSelect(doctor.doctor_id)}
             style={{
               padding: '1.5rem',
               border: '2px solid #e5e7eb',
@@ -297,23 +314,23 @@ const BookAppointment = () => {
               backgroundColor: 'white'
             }}
             onMouseEnter={(e) => {
-              e.target.style.borderColor = '#3b82f6'
-              e.target.style.backgroundColor = '#f8fafc'
+              e.currentTarget.style.borderColor = '#3b82f6'
+              e.currentTarget.style.backgroundColor = '#f8fafc'
             }}
             onMouseLeave={(e) => {
-              e.target.style.borderColor = '#e5e7eb'
-              e.target.style.backgroundColor = 'white'
+              e.currentTarget.style.borderColor = '#e5e7eb'
+              e.currentTarget.style.backgroundColor = 'white'
             }}
           >
-            <h4 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>Dr. {doctor.name}</h4>
+            <h4 style={{ color: '#1e293b', marginBottom: '0.5rem' }}>Dr. {doctor.user?.first_name} {doctor.user?.last_name}</h4>
             <p style={{ color: '#3b82f6', fontSize: '0.9rem', fontWeight: '500', marginBottom: '0.5rem' }}>
               {doctor.specialization}
             </p>
             <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-              Experience: {doctor.experience || 'N/A'} years
+              Experience: {doctor.experience_years || 'N/A'} years
             </p>
             <p style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: '500' }}>
-              Available today
+              {doctor.time_slots?.length || 0} slots available
             </p>
           </div>
         ))}
@@ -399,13 +416,13 @@ const BookAppointment = () => {
         <div className="grid grid-3" style={{ gap: '1rem' }}>
           {availableSlots.map((slot) => (
             <div
-              key={slot.time}
-              onClick={() => handleTimeSlotSelect(slot.time)}
+              key={slot.slotId}
+              onClick={() => slot.available && handleTimeSlotSelect(slot.time)}
               style={{
                 padding: '1rem',
                 border: '2px solid #e5e7eb',
                 borderRadius: '0.5rem',
-                cursor: 'pointer',
+                cursor: slot.available ? 'pointer' : 'not-allowed',
                 textAlign: 'center',
                 transition: 'all 0.2s',
                 backgroundColor: slot.available ? 'white' : '#f3f4f6',
@@ -413,14 +430,14 @@ const BookAppointment = () => {
               }}
               onMouseEnter={(e) => {
                 if (slot.available) {
-                  e.target.style.borderColor = '#3b82f6'
-                  e.target.style.backgroundColor = '#f8fafc'
+                  e.currentTarget.style.borderColor = '#3b82f6'
+                  e.currentTarget.style.backgroundColor = '#f8fafc'
                 }
               }}
               onMouseLeave={(e) => {
                 if (slot.available) {
-                  e.target.style.borderColor = '#e5e7eb'
-                  e.target.style.backgroundColor = 'white'
+                  e.currentTarget.style.borderColor = '#e5e7eb'
+                  e.currentTarget.style.backgroundColor = 'white'
                 }
               }}
             >
@@ -431,7 +448,7 @@ const BookAppointment = () => {
                 color: slot.available ? '#10b981' : '#ef4444', 
                 fontSize: '0.8rem' 
               }}>
-                {slot.available ? 'Available' : 'Booked'}
+                {slot.available ? '✓ Available' : '❌ Booked'}
               </p>
             </div>
           ))}
@@ -491,7 +508,7 @@ const BookAppointment = () => {
           <div style={{ display: 'grid', gap: '0.5rem' }}>
             <p><strong>Date:</strong> {new Date(bookingData.date).toLocaleDateString()}</p>
             <p><strong>Time:</strong> {bookingData.timeSlot}</p>
-            <p><strong>Doctor:</strong> Dr. {doctors.find(d => d.id === bookingData.doctorId)?.name}</p>
+            <p><strong>Doctor:</strong> Dr. {doctors.find(d => d.doctor_id === bookingData.doctorId)?.user?.first_name} {doctors.find(d => d.doctor_id === bookingData.doctorId)?.user?.last_name}</p>
             <p><strong>Hospital:</strong> {hospitals.find(h => h.id === bookingData.hospitalId)?.name}</p>
           </div>
         </div>

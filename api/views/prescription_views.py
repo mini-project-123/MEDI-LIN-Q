@@ -30,7 +30,7 @@ class DoctorPrescriptionListView(generics.ListAPIView):
         ).select_related(
             'appointment__patient__user', # Optimizes for patient name
             'medication'                  # Optimizes for medication name
-        ).order_by('-appointment__appointment_datetime') # Show newest first
+        ).order_by('-appointment__created_at') # Show newest first
 
         return queryset
     
