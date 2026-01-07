@@ -65,13 +65,13 @@ const PatientAppointments = () => {
     setError(null)
     try {
       const token = localStorage.getItem('accessToken')
-      // We get all data from the main dashboard endpoint
-      const response = await axios.get('/api/dashboard/', {
+      // Fetch appointments from the correct endpoint
+      const response = await axios.get('/api/patients/appointments/', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       
       // Save the appointments array from the response
-      setAppointments(response.data.appointments || [])
+      setAppointments(response.data || [])
       
     } catch (err) {
       console.error('Error fetching appointments:', err)

@@ -100,8 +100,8 @@ class HospitalAppointmentListSerializer(serializers.ModelSerializer):
 class HospitalMedicalReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = MedicalReport
-        fields = ['id', 'report_type', 'description', 'report_file', 'patient', 'created_at']
-    read_only_fields = ['id', 'patient', 'created_at']
+        fields = ['id', 'report_type', 'description', 'report_file', 'created_at']
+    read_only_fields = ['id', 'created_at']
 
 
 # ------------------------------ Staff Detail (GET/PATCH/DELETE) ------------------------------

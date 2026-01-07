@@ -195,7 +195,11 @@ class HospitalAnalyticsView(APIView):
             hospital=hospital, appointment_date__gte=twelve_months_ago
         ).annotate(month=TruncMonth('appointment_date')).values('month').annotate(visits=Count('id')).order_by('month')
 
-        monthly_visits = {item['month'].strftime('%Y-%m-%d'): item['visits'] for item in monthly_visits_data}
+        # Safe handling of month formatting - skip None values
+        monthly_visits = {}
+        for item in monthly_visits_data:
+            if item['month']:
+                monthly_visits[item['month'].strftime('%Y-%m-%d')] = item['visits']
 
         department_data = Appointment.objects.filter(hospital=hospital).values('doctor__specialization').annotate(appointment_count=Count('id')).order_by('-appointment_count')
         department_distribution = {item['doctor__specialization']: item['appointment_count'] for item in department_data if item['doctor__specialization']}
@@ -290,6 +294,33 @@ class HospitalPatientReportUploadView(generics.CreateAPIView):
         except PatientProfile.DoesNotExist:
             raise serializers.ValidationError("Patient not found.")
         serializer.save(patient=patient_profile)
+
+
+# Get Patient Medical Reports
+class HospitalPatientReportsListView(generics.ListAPIView):
+    """Get all medical reports for a specific patient (hospital admin only)"""
+    serializer_class = HospitalMedicalReportSerializer
+    permission_classes = [permissions.IsAuthenticated, IsHospitalAdminUser]
+
+    def get_queryset(self):
+        patient_user_id = self.kwargs.get('pk')
+        hospital = get_admin_hospital(self.request)
+        if not hospital:
+            return MedicalReport.objects.none()
+        
+        # Only return reports for patients in this hospital
+        try:
+            patient_profile = PatientProfile.objects.get(user_id=patient_user_id)
+            # Verify patient has appointments in this hospital
+            has_appointments = Appointment.objects.filter(
+                hospital=hospital,
+                patient=patient_profile
+            ).exists()
+            if has_appointments:
+                return MedicalReport.objects.filter(patient=patient_profile).order_by('-created_at')
+        except PatientProfile.DoesNotExist:
+            pass
+        return MedicalReport.objects.none()
 
 
 # Get Patient History (Appointments & Medical Reports)

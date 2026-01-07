@@ -25,22 +25,42 @@ class DoctorSlotSerializer(serializers.ModelSerializer):
     """Doctor with available time slots"""
     user = serializers.SerializerMethodField()
     hospital_name = serializers.CharField(source='hospital.name', read_only=True)
-    time_slots = TimeSlotSerializer(many=True, read_only=True)
     doctor_id = serializers.SerializerMethodField()
+    available_slots_count = serializers.SerializerMethodField()
     
     class Meta:
         model = DoctorProfile
-        fields = ['doctor_id', 'user', 'specialization', 'qualification', 'experience_years', 'hospital_name', 'time_slots']
+        fields = ['doctor_id', 'user', 'specialization', 'qualification', 'experience_years', 'hospital_name', 'available_slots_count']
     
     def get_doctor_id(self, obj):
-        return obj.user.id
+        return obj.user_id  # Use user_id as the doctor ID
     
     def get_user(self, obj):
         return {
+            'id': obj.user.id,
             'first_name': obj.user.first_name,
             'last_name': obj.user.last_name,
             'email': obj.user.email,
         }
+    
+    def get_available_slots_count(self, obj):
+        """Calculate available slots for tomorrow"""
+        from datetime import datetime, timedelta
+        tomorrow = datetime.now().date() + timedelta(days=1)
+        
+        # Skip if weekend
+        if tomorrow.weekday() >= 5:
+            return 0
+        
+        from api.models import Appointment
+        booked = Appointment.objects.filter(
+            doctor=obj,
+            appointment_date=tomorrow,
+            status__in=['pending', 'confirmed']
+        ).count()
+        
+        # 8 slots per day (9 AM to 5 PM)
+        return max(0, 8 - booked)
 
 
 class AppointmentBookingSerializer(serializers.ModelSerializer):

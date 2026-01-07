@@ -117,14 +117,28 @@ const BookAppointmentModal = ({ isOpen, onClose, onSuccess }) => {
           date: appointmentDate
         }
       })
-      setTimeSlots(response.data.available_slots || [])
+      
+      // Extract time strings from slot objects
+      const slots = response.data.available_slots || []
+      const timeStrings = slots.map(slot => {
+        // Handle both formats: {time: "10:00:00"} and "10:00"
+        if (typeof slot === 'string') {
+          return slot
+        } else if (slot.time) {
+          // Convert "10:00:00" to "10:00"
+          return slot.time.substring(0, 5)
+        }
+        return slot
+      })
+      
+      setTimeSlots(timeStrings)
     } catch (err) {
       console.error('Error fetching time slots:', err)
       setError('Failed to load available time slots')
       // Set mock time slots for demonstration
       setTimeSlots([
-        '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-        '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
+        '09:00', '10:00', '11:00', '12:00',
+        '14:00', '15:00', '16:00'
       ])
     } finally {
       setTimeSlotLoading(false)
@@ -150,7 +164,7 @@ const BookAppointmentModal = ({ isOpen, onClose, onSuccess }) => {
         additional_notes: appointmentDetails.additionalNotes
       }
 
-      const response = await axios.post('/api/booking/workflow/book/', bookingData, {
+      const response = await axios.post('/api/booking/appointments/book/', bookingData, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
@@ -313,13 +327,15 @@ const BookAppointmentModal = ({ isOpen, onClose, onSuccess }) => {
                       }
                     }}
                   >
-                    <div>
-                      <h4 style={{ color: theme.text, margin: '0 0 0.25rem 0' }}>{hospital.name}</h4>
+                  <div>
+                      <h4 style={{ color: theme.text, margin: '0 0 0.25rem 0' }}>
+                        {hospital.name}
+                      </h4>
                       <p style={{ color: theme.textSecondary, margin: '0 0 0.5rem 0', fontSize: '0.85rem' }}>
                         {hospital.address}
                       </p>
-                      <p style={{ color: theme.textSecondary, margin: 0, fontSize: '0.85rem' }}>
-                        {hospital.contact_no1}
+                      <p style={{ color: '#3b82f6', margin: 0, fontSize: '0.85rem', fontWeight: '500' }}>
+                        {hospital.doctors_count} doctors available
                       </p>
                     </div>
                     <ChevronRight size={20} style={{ color: '#3b82f6', opacity: selectedHospital?.id === hospital.id ? 1 : 0 }} />
@@ -377,7 +393,7 @@ const BookAppointmentModal = ({ isOpen, onClose, onSuccess }) => {
                   >
                     <div>
                       <h4 style={{ color: theme.text, margin: '0 0 0.25rem 0' }}>
-                        Dr. {doctor.user?.first_name} {doctor.user?.last_name}
+                        Dr. {doctor.first_name} {doctor.last_name}
                       </h4>
                       <p style={{ color: theme.textSecondary, margin: '0 0 0.25rem 0', fontSize: '0.85rem' }}>
                         {doctor.specialization}

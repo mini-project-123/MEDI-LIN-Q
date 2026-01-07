@@ -265,7 +265,7 @@ const BookAppointment = () => {
               {hospital.address}
             </p>
             <p style={{ color: '#3b82f6', fontSize: '0.9rem', fontWeight: '500' }}>
-              {hospital.doctorCount || 0} doctors available
+              {hospital.doctors_count || 0} doctors available
             </p>
           </div>
         ))}

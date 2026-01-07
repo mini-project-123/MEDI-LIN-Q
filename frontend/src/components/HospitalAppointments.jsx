@@ -297,7 +297,7 @@ const HospitalAppointments = () => {
                       
                       {/* Type */}
                       <td style={{ padding: '1rem 1.5rem', color: theme.text, fontSize: '0.9rem', textTransform: 'capitalize' }}>
-                        {apt.appointment_type.replace('_', ' ') || 'N/A'}
+                        {apt.appointment_type ? apt.appointment_type.replace('_', ' ') : 'N/A'}
                       </td>
                       
                       {/* Status */}

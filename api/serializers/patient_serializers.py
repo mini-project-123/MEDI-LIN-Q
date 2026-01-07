@@ -292,11 +292,19 @@ class _PatientDashDoctorUserSerializer(serializers.ModelSerializer):
         fields = ['first_name', 'last_name']
 
 class _PatientDashDoctorSerializer(serializers.ModelSerializer):
-    """Minimal doctor data"""
+    """Minimal doctor data with name"""
     user = _PatientDashDoctorUserSerializer(read_only=True)
+    name = serializers.SerializerMethodField()
+    
+    def get_name(self, obj):
+        """Provide a full name for frontend compatibility"""
+        if obj.user:
+            return f"Dr. {obj.user.first_name} {obj.user.last_name}".strip()
+        return "Doctor"
+    
     class Meta:
         model = DoctorProfile
-        fields = ['user', 'specialization']
+        fields = ['user', 'specialization', 'name']
 
 class _PatientDashHospitalSerializer(serializers.ModelSerializer):
     """Minimal hospital data"""

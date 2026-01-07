@@ -52,6 +52,7 @@ urlpatterns = [
     # --- MEDICAL REPORTS ---
     # GET/POST: List and upload medical reports
     path('medical-reports/', PatientMedicalReportsView.as_view(), name='medical-reports-list'),
+    path('patients/medical-reports/', PatientMedicalReportsView.as_view(), name='medical-reports-list-alt'),
     
     # GET/DELETE: Medical report details
     path('medical-reports/<int:pk>/', PatientMedicalReportDetailView.as_view(), name='medical-report-detail'),
@@ -59,6 +60,7 @@ urlpatterns = [
     # --- APPOINTMENTS ---
     # GET: All appointments with filtering and pagination
     path('appointments/', PatientAppointmentsHistoryView.as_view(), name='patient-appointments'),
+    path('patients/appointments/', PatientAppointmentsHistoryView.as_view(), name='patient-appointments-alt'),
     
     # GET: Appointment details
     path('appointments/<int:pk>/', PatientAppointmentDetailView.as_view(), name='patient-appointment-detail'),

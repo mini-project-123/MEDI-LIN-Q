@@ -41,7 +41,7 @@ const Navbar = () => {
           }}
         >
           <Calendar size={32} />
-          MedLinq
+          Medi-Lin-Q
         </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

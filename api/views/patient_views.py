@@ -258,14 +258,34 @@ class PatientMedicalReportsView(generics.ListCreateAPIView):
             return MedicalReport.objects.none()
 
     def get_serializer_class(self):
-        # Import here to avoid circular imports
-        from api.serializers.patient_serializers import (
-            SimpleMedicalReportSerializer,
-            MedicalReportCreateSerializer
-        )
-        if self.request.method == 'POST':
-            return MedicalReportCreateSerializer
+        from api.serializers.patient_serializers import SimpleMedicalReportSerializer
         return SimpleMedicalReportSerializer
+
+    def list(self, request, *args, **kwargs):
+        """Override list to return proper format"""
+        try:
+            patient_profile = request.user.patientprofile
+            reports = MedicalReport.objects.filter(patient=patient_profile).order_by('-created_at')
+            
+            # Format reports for frontend
+            data = []
+            for report in reports:
+                data.append({
+                    'id': report.id,
+                    'title': report.report_type or 'Medical Report',
+                    'type': report.report_type or 'other',
+                    'description': report.description or '',
+                    'date': report.created_at.isoformat() if report.created_at else '',
+                    'created_at': report.created_at.isoformat() if report.created_at else '',
+                    'doctor_name': 'Hospital Admin',
+                    'hospital_name': 'Hospital',
+                    'file': report.report_file.url if report.report_file else None,
+                    'file_name': report.report_file.name if report.report_file else None,
+                })
+            
+            return Response(data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def perform_create(self, serializer):
         try:
@@ -330,7 +350,6 @@ class PatientAppointmentsHistoryView(generics.ListAPIView):
       - to_date: Filter to date (YYYY-MM-DD)
       - ordering: 'appointment_date' or '-appointment_date'
     """
-    serializer_class = None
     permission_classes = [IsAuthenticated, IsPatientUser]
     filter_backends = [SearchFilter, OrderingFilter]
     ordering_fields = ['appointment_date', 'created_at']
@@ -366,9 +385,40 @@ class PatientAppointmentsHistoryView(generics.ListAPIView):
         except PatientProfile.DoesNotExist:
             return Appointment.objects.none()
 
-    def get_serializer_class(self):
-        from api.serializers.patient_serializers import PatientDashboardAppointmentSerializer
-        return PatientDashboardAppointmentSerializer
+    def list(self, request, *args, **kwargs):
+        """Override list to return proper format"""
+        try:
+            patient_profile = request.user.patientprofile
+            queryset = self.get_queryset()
+            
+            # Format appointments for frontend
+            data = []
+            for appointment in queryset:
+                data.append({
+                    'id': appointment.id,
+                    'custom_id': appointment.custom_id,
+                    'status': appointment.status,
+                    'appointment_date': str(appointment.appointment_date),
+                    'appointment_time': str(appointment.appointment_time),
+                    'appointment_type': appointment.appointment_type,
+                    'token_number': appointment.token_number,
+                    'doctor': {
+                        'user_id': appointment.doctor.user_id,  # Use user_id, not id
+                        'user': {
+                            'first_name': appointment.doctor.user.first_name,
+                            'last_name': appointment.doctor.user.last_name,
+                        },
+                        'specialization': appointment.doctor.specialization,
+                    },
+                    'hospital': {
+                        'id': appointment.hospital.id if appointment.hospital else None,
+                        'name': appointment.hospital.name if appointment.hospital else None,
+                    }
+                })
+            
+            return Response(data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ---------------------------

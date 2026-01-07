@@ -1,174 +1,183 @@
-# MEDI-LIN-Q Demo Credentials
+# MediLinQ - Demo Credentials
 
-## Hospital Admins
-
-### City Hospital
-- **Email**: admin@cityhospital.com
-- **Password**: CityHosp@123
-- **Role**: Hospital Admin
-- **Features Available**:
-  - Manage patients and doctors
-  - View hospital analytics
-  - Create articles
-  - View appointments
-  - Manage hospital settings
-
-### Apollo Medical Center
-- **Email**: admin@apollomedical.com
-- **Password**: Apollo@123
-- **Role**: Hospital Admin
-- **Features Available**:
-  - Manage patients and doctors
-  - View hospital analytics
-  - Create articles
-  - View appointments
-  - Manage hospital settings
-
-### St. Mary's Hospital
-- **Email**: admin@stmarys.com
-- **Password**: StMary@123
-- **Role**: Hospital Admin
-- **Features Available**:
-  - Manage patients and doctors
-  - View hospital analytics
-  - Create articles
-  - View appointments
-  - Manage hospital settings
+## Login URL
+**http://localhost:3000/login**
 
 ---
 
-## Doctors
+## Hospital Admins (3)
 
 ### City Hospital
-
-**Dr. James Wilson** (Cardiology)
-- **Email**: james.wilson@cityhospital.com
-- **Password**: DrWilson@123
-- **Specialization**: Cardiology
-
-**Dr. Sarah Mitchell** (Orthopedics)
-- **Email**: sarah.mitchell@cityhospital.com
-- **Password**: DrMitchell@123
-- **Specialization**: Orthopedics
-
-**Dr. Michael Johnson** (Neurology)
-- **Email**: michael.johnson@cityhospital.com
-- **Password**: DrJohnson@123
-- **Specialization**: Neurology
+- **Email:** `admin@cityhospital.com`
+- **Password:** `CityHosp@123`
+- **Role:** Hospital Admin
+- **Hospital:** City Hospital
 
 ### Apollo Medical Center
-
-**Dr. Emily Chen** (Pediatrics)
-- **Email**: emily.chen@apollomedical.com
-- **Password**: DrChen@123
-- **Specialization**: Pediatrics
-
-**Dr. David Kumar** (Internal Medicine)
-- **Email**: david.kumar@apollomedical.com
-- **Password**: DrKumar@123
-- **Specialization**: Internal Medicine
+- **Email:** `admin@apollomedical.com`
+- **Password:** `Apollo@123`
+- **Role:** Hospital Admin
+- **Hospital:** Apollo Medical Center
 
 ### St. Mary's Hospital
-
-**Dr. Lisa Anderson** (Oncology)
-- **Email**: lisa.anderson@stmarys.com
-- **Password**: DrAnderson@123
-- **Specialization**: Oncology
-
-**Dr. Robert Thompson** (Gastroenterology)
-- **Email**: robert.thompson@stmarys.com
-- **Password**: DrThompson@123
-- **Specialization**: Gastroenterology
+- **Email:** `admin@stmarys.com`
+- **Password:** `StMary@123`
+- **Role:** Hospital Admin
+- **Hospital:** St. Mary's Hospital
 
 ---
 
-## Patients
+## Doctors (7)
+
+### City Hospital
+
+**Dr. James Wilson** - Cardiology
+- **Email:** `james.wilson@cityhospital.com`
+- **Password:** `DrWilson@123`
+- **Experience:** 10 years
+
+**Dr. Sarah Mitchell** - Orthopedics
+- **Email:** `sarah.mitchell@cityhospital.com`
+- **Password:** `DrMitchell@123`
+- **Experience:** 8 years
+
+**Dr. Michael Johnson** - Neurology
+- **Email:** `michael.johnson@cityhospital.com`
+- **Password:** `DrJohnson@123`
+- **Experience:** 12 years
+
+### Apollo Medical Center
+
+**Dr. Emily Chen** - Pediatrics
+- **Email:** `emily.chen@apollomedical.com`
+- **Password:** `DrChen@123`
+- **Experience:** 7 years
+
+**Dr. David Kumar** - Internal Medicine
+- **Email:** `david.kumar@apollomedical.com`
+- **Password:** `DrKumar@123`
+- **Experience:** 9 years
+
+### St. Mary's Hospital
+
+**Dr. Lisa Anderson** - Oncology
+- **Email:** `lisa.anderson@stmarys.com`
+- **Password:** `DrAnderson@123`
+- **Experience:** 15 years
+
+**Dr. Robert Thompson** - Gastroenterology
+- **Email:** `robert.thompson@stmarys.com`
+- **Password:** `DrThompson@123`
+- **Experience:** 11 years
+
+---
+
+## Patients (7)
 
 ### City Hospital
 
 **John Smith**
-- **Email**: john.smith@email.com
-- **Password**: Patient@Smith1
-- **Blood Group**: O+
+- **Email:** `john.smith@email.com`
+- **Password:** `Patient@Smith1`
+- **Blood Group:** O+
 
 **Mary Johnson**
-- **Email**: mary.johnson@email.com
-- **Password**: Patient@Mary2
-- **Blood Group**: A+
+- **Email:** `mary.johnson@email.com`
+- **Password:** `Patient@Mary2`
+- **Blood Group:** A+
 
 **Robert Brown**
-- **Email**: robert.brown@email.com
-- **Password**: Patient@Brown3
-- **Blood Group**: B+
+- **Email:** `robert.brown@email.com`
+- **Password:** `Patient@Brown3`
+- **Blood Group:** B+
 
 ### Apollo Medical Center
 
 **Patricia Davis**
-- **Email**: patricia.davis@email.com
-- **Password**: Patient@Patricia4
-- **Blood Group**: O-
+- **Email:** `patricia.davis@email.com`
+- **Password:** `Patient@Patricia4`
+- **Blood Group:** O-
 
 **Michael Wilson**
-- **Email**: michael.wilson@email.com
-- **Password**: Patient@Mike5
-- **Blood Group**: AB+
+- **Email:** `michael.wilson@email.com`
+- **Password:** `Patient@Mike5`
+- **Blood Group:** AB+
 
 ### St. Mary's Hospital
 
 **Jennifer Garcia**
-- **Email**: jennifer.garcia@email.com
-- **Password**: Patient@Jenny6
-- **Blood Group**: O+
+- **Email:** `jennifer.garcia@email.com`
+- **Password:** `Patient@Jenny6`
+- **Blood Group:** O+
 
 **William Martinez**
-- **Email**: william.martinez@email.com
-- **Password**: Patient@Will7
-- **Blood Group**: A+
+- **Email:** `william.martinez@email.com`
+- **Password:** `Patient@Will7`
+- **Blood Group:** A+
 
 ---
 
-## Demo Data Overview
+## Demo Data Summary
 
-- **3 Hospitals**: City Hospital, Apollo Medical Center, St. Mary's Hospital
-- **7 Doctors**: Distributed across 3 hospitals with various specializations
-- **7 Patients**: Distributed across 3 hospitals
-- **14-21 Appointments**: Realistic appointment data with past and future dates
-- **5 Healthcare Articles**: Published articles by doctors
+- **Total Users:** 17 (3 admins + 7 doctors + 7 patients)
+- **Hospitals:** 3
+- **Doctors:** 7 (distributed across 3 hospitals)
+- **Patients:** 7 (distributed across 3 hospitals)
+- **Appointments:** 21 (3 per patient with various statuses)
+- **Articles:** 5 (written by doctors)
 
 ---
 
-## Login URL
-
-All users can login at: **http://localhost:3003/login**
-
-## Dashboard Features to Test
+## Features to Test
 
 ### Hospital Admin Dashboard
-- Patient Management (add, view, edit, delete patients)
-- Doctor Management (add, view, edit, delete doctors)
-- Appointments View
-- Analytics Dashboard
-- Write Articles
-- Hospital Settings
+- ✅ View and manage patients
+- ✅ View and manage doctors
+- ✅ View appointments
+- ✅ Upload medical reports for patients
+- ✅ View hospital analytics
+- ✅ Write articles
 
 ### Doctor Dashboard
-- View Appointments
-- Patient History
-- Write Articles
-- Doctor Settings
+- ✅ View appointments
+- ✅ View patients
+- ✅ Filter patients by consultation type
+- ✅ View patient history
+- ✅ Write articles
 
-### Patient Portal
-- Book Appointments
-- View Appointments
-- View Medical History
-- Read Articles
-- Patient Settings
+### Patient Dashboard
+- ✅ View appointments
+- ✅ Book appointments
+- ✅ View medical reports
+- ✅ View AI summary of reports
+- ✅ View prescriptions
+- ✅ View health analytics
+- ✅ Read articles
 
 ---
 
-## Fixed Issues (This Session)
+## Quick Start
 
-✅ **Patient List Pagination** - Fixed response handling for patient list after adding new patients
-✅ **Doctor List Pagination** - Fixed response handling for doctor list after adding new doctors
-✅ **Article Creation** - Enabled hospital admins to create articles (previously restricted to doctors only)
-✅ **Demo Data Population** - Successfully created comprehensive database with interconnected data
+1. **Start Backend:**
+   ```bash
+   python manage.py runserver
+   ```
+
+2. **Start Frontend:**
+   ```bash
+   npm start
+   ```
+
+3. **Login with any credential above**
+
+4. **Test the features!**
+
+---
+
+## Notes
+
+- All passwords are case-sensitive
+- Each user has access to their respective hospital's data
+- Patients can only see their own appointments and reports
+- Doctors can see patients from their hospital
+- Hospital admins can manage all data for their hospital

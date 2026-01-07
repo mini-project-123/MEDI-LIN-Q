@@ -33,7 +33,7 @@ const PatientReports = () => {
       setError(null)
       
       const token = localStorage.getItem('accessToken')
-      const response = await axios.get('/api/medical-reports-api/', {
+      const response = await axios.get('/api/patients/medical-reports/', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       

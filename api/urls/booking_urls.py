@@ -17,6 +17,12 @@ urlpatterns = [
     path('hospitals/<int:hospital_id>/doctors/', hospital_doctors, name='hospital-doctors'),
     path('doctors/<int:doctor_id>/slots/', doctor_slots, name='doctor-slots'),
     
+    # Workflow endpoints (for multi-step booking) - support query parameters
+    path('workflow/hospitals/', hospital_list, name='workflow-hospitals'),
+    path('workflow/doctors/', hospital_doctors, name='workflow-doctors'),  # Uses query param hospital_id
+    path('workflow/schedule/', doctor_slots, name='workflow-schedule'),  # Uses query params doctor_id, date
+    path('workflow/book/', book_appointment, name='workflow-book'),
+    
     # Appointment Management
     path('appointments/book/', book_appointment, name='book-appointment'),
     path('appointments/my/', patient_appointments, name='patient-appointments'),
