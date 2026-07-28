@@ -183,32 +183,31 @@ MEDI-LIN-Q/
 
 | Landing Page | Specialties & Quick Access |
 |---------------|----------------------------|
-| ![](docs/screenshots/landing page.png) | ![](docs/screenshots/landing_page.png) |
+| ![](med/landing%20page.png) | ![](med/landing_page.png) |
 
 | Login & Signup | Patient Health Analytics |
 |----------------|--------------------------|
-| ![](docs/screenshots/login and signup.png) | ![](docs/screenshots/patient home page.png) |
+| ![](med/login%20and%20signup.png) | ![](med/patient%20home%20page.png) |
 
 | Appointment Booking | Patient Appointments |
 |---------------------|----------------------|
-| ![](docs/screenshots/appointment booking.png) | ![](docs/screenshots/patient appointments.png) |
+| ![](med/appointment%20booking.png) | ![](med/patient%20appointments.png) |
 
 | Electronic Health Records | AI Report Summarisation |
 |---------------------------|-------------------------|
-| ![](docs/screenshots/electronic health records.png) | ![](docs/screenshots/ai report summarisation chatbot.png) |
+| ![](med/electronic%20health%20records.png) | ![](med/ai%20report%20summarisation%20chatbot.png) |
 
 | Doctor Patient Directory | Doctor Appointment Directory |
 |--------------------------|------------------------------|
-| ![](docs/screenshots/patient directory for doctors.png) | ![](docs/screenshots/appointment directory for doctors.png) |
+| ![](med/patient%20directory%20for%20doctors.png) | ![](med/appointment%20directory%20for%20doctors.png) |
 
 | Hospital Appointments | Hospital Dashboard |
 |-----------------------|--------------------|
-| ![](docs/screenshots/hospital appointments.png) | ![](docs/screenshots/Hospital dashboard.png) |
+| ![](med/hospital%20appointments.png) | ![](med/Hospital%20dashboard.png) |
 
 | Hospital Staff Directory |
 |--------------------------|
-| ![](docs/screenshots/staff directory for hospitals.png) |
-
+| ![](med/staff%20directory%20for%20hospitals.png) |
 ## Security
 
 Implemented in the current codebase:
