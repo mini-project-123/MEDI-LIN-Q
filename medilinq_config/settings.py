@@ -1,17 +1,18 @@
-"""
-Django settings for medilinq_config project.
-"""
+"""Django settings for medilinq_config project."""
 
+from datetime import timedelta
 from pathlib import Path
-import os
+
+from .env import env_bool, env_list, env_str, load_env_file
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_env_file(BASE_DIR / ".env")
 
-SECRET_KEY = "django-insecure-(!^&&_yfj)t5#z)0rozr6fe0umbd*6(ab*vg9k@u*u#g@r**vo"
+SECRET_KEY = env_str("DJANGO_SECRET_KEY", "django-insecure-change-me")
 
-DEBUG = True
+DEBUG = env_bool("DJANGO_DEBUG", True)
 
-ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', 'testserver']
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1", "testserver"])
 
 
 INSTALLED_APPS = [
@@ -69,11 +70,11 @@ WSGI_APPLICATION = "medilinq_config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "medilinq_db",
-        "USER": "postgres",
-        "PASSWORD": "shreyaF2006*",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": env_str("DATABASE_NAME", "medilinq_db"),
+        "USER": env_str("DATABASE_USER", "postgres"),
+        "PASSWORD": env_str("DATABASE_PASSWORD", ""),
+        "HOST": env_str("DATABASE_HOST", "localhost"),
+        "PORT": env_str("DATABASE_PORT", "5432"),
     }
 }
 
@@ -107,9 +108,6 @@ REST_FRAMEWORK = {
     ),
 }
 
-# Extended JWT Token Lifetime
-from datetime import timedelta
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),  # Extended from 5 minutes
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),  # Extended from 1 day
@@ -120,8 +118,8 @@ SIMPLE_JWT = {
 AUTH_USER_MODEL = "api.User"
 
 
-GOOGLE_API_KEY = "AIzaSyBinnnxNVU8AZ-m2lvlsf7B87RRWJjJItU"
+GOOGLE_API_KEY = env_str("GOOGLE_API_KEY", "")
 
 
 # Allow all origins for development (React frontend etc.)
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", True)

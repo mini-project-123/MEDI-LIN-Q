@@ -39,6 +39,66 @@ from api.serializers.patient_serializers import (
 )
 
 
+def build_fallback_report_summary(report):
+    report_type = (report.report_type or 'medical report').strip()
+    description = (report.description or '').strip()
+
+    summary_parts = [
+        f'This {report_type.lower()} has been uploaded successfully.',
+    ]
+
+    if description:
+      summary_parts.append(
+          'In simple words, the note says: ' + description[:260] + ('...' if len(description) > 260 else '')
+      )
+    else:
+      summary_parts.append(
+          'The report does not include a written description, so please use the report file itself and discuss the details with your doctor.'
+      )
+
+    summary_parts.append(
+        'If anything is marked high, low, abnormal, or outside the usual range, follow up with your doctor for confirmation.'
+    )
+    return ' '.join(summary_parts)
+
+
+def build_fallback_chat_response(message, context='general'):
+    text = (message or '').lower()
+
+    if any(keyword in text for keyword in ['report', 'summary', 'test result', 'lab result', 'uploaded report']):
+        return (
+            'From your uploaded report, focus on the values marked high, low, or abnormal. '
+            'Those are the parts that usually need attention. If you want, I can also explain the report line by line in simple language.'
+        )
+
+    if any(keyword in text for keyword in ['fever', 'temperature', 'cold', 'cough']):
+        return (
+            'A fever or flu-like illness often improves with rest, fluids, and monitoring. '
+            'If the fever is high, lasts more than a few days, or comes with breathing trouble, please see a doctor.'
+        )
+
+    if any(keyword in text for keyword in ['blood pressure', 'bp']):
+        return (
+            'Blood pressure is a measure of how hard your blood pushes against your arteries. '
+            'If your reading stays high or low repeatedly, it is worth discussing with a doctor.'
+        )
+
+    if any(keyword in text for keyword in ['medicine', 'tablet', 'dose', 'dosage']):
+        return (
+            'Take medicine exactly as prescribed and do not change the dose on your own. '
+            'If you miss a dose or feel side effects, check with your doctor or pharmacist.'
+        )
+
+    if context == 'medical_query':
+        return (
+            'In simple words, keep an eye on the symptoms, rest well, stay hydrated, and contact your doctor if the problem continues or gets worse.'
+        )
+
+    return (
+        'Here is the simple version: watch the main findings, compare them with the normal range shown in the report, and ask your doctor if anything looks unusual.'
+    )
+
+
 # ---------------------------
 # Patient profile (create)
 # ---------------------------
@@ -705,6 +765,7 @@ class PatientReportAISummaryView(generics.RetrieveAPIView):
     """
     permission_classes = [permissions.IsAuthenticated, IsPatientUser]
     lookup_field = 'pk'
+    lookup_url_kwarg = 'report_id'
 
     def get_queryset(self):
         try:
@@ -713,7 +774,7 @@ class PatientReportAISummaryView(generics.RetrieveAPIView):
         except PatientProfile.DoesNotExist:
             return MedicalReport.objects.none()
 
-    def retrieve(self, request, *args, **kwargs):
+    def _summarize_report(self, request, *args, **kwargs):
         report = self.get_object()
         
         try:
@@ -740,7 +801,7 @@ class PatientReportAISummaryView(generics.RetrieveAPIView):
             
             response = model.generate_content(prompt)
             ai_summary = response.text
-            
+
             return Response({
                 'report_id': report.id,
                 'report_type': report.report_type,
@@ -750,10 +811,21 @@ class PatientReportAISummaryView(generics.RetrieveAPIView):
             })
             
         except Exception as e:
+            fallback_summary = build_fallback_report_summary(report)
             return Response({
-                'error': f'Failed to generate AI summary: {str(e)}',
-                'status': 'error'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'report_id': report.id,
+                'report_type': report.report_type,
+                'report_date': report.created_at.date(),
+                'ai_summary': fallback_summary,
+                'status': 'fallback',
+                'warning': f'AI summary fallback used: {str(e)}'
+            })
+
+    def retrieve(self, request, *args, **kwargs):
+        return self._summarize_report(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        return self._summarize_report(request, *args, **kwargs)
 
 
 # =====================================================
@@ -789,34 +861,40 @@ class PatientAIChatbotView(APIView):
             # Get patient profile for context
             patient_profile = request.user.patientprofile
             
-            import google.generativeai as genai
-            from django.conf import settings
-            
-            # Configure AI
-            genai.configure(api_key=settings.GOOGLE_API_KEY)
-            model = genai.GenerativeModel('gemini-pro')
-            
-            # Build context-aware prompt
-            if context == 'medical_query':
-                system_prompt = f"""You are a helpful health assistant. The user is a patient with:
+            ai_response = None
+
+            try:
+                import google.generativeai as genai
+                from django.conf import settings
+
+                api_key = getattr(settings, 'GOOGLE_API_KEY', None)
+                if not api_key:
+                    raise ValueError('Google AI key is not configured')
+
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-pro')
+
+                if context == 'medical_query':
+                    system_prompt = f"""You are a helpful health assistant. The user is a patient with:
 - Blood Group: {patient_profile.blood_group or 'Not specified'}
 - Allergies: {patient_profile.allergies or 'None'}
 
 Provide helpful health information. IMPORTANT: Always recommend consulting with a doctor for serious concerns.
 Keep response concise (2-3 sentences maximum)."""
-            
-            elif context == 'appointment':
-                system_prompt = """You are a helpful health scheduling assistant. Help users understand appointment process.
+
+                elif context == 'appointment':
+                    system_prompt = """You are a helpful health scheduling assistant. Help users understand appointment process.
 Keep response concise and friendly."""
-            
-            else:
-                system_prompt = """You are a helpful health information assistant. Provide general health guidance.
+
+                else:
+                    system_prompt = """You are a helpful health information assistant. Provide general health guidance.
 Keep response concise and clear."""
-            
-            # Generate response
-            full_prompt = f"{system_prompt}\n\nUser Question: {message}"
-            response = model.generate_content(full_prompt)
-            ai_response = response.text
+
+                full_prompt = f"{system_prompt}\n\nUser Question: {message}"
+                response = model.generate_content(full_prompt)
+                ai_response = response.text
+            except Exception:
+                ai_response = build_fallback_chat_response(message, context)
             
             return Response({
                 'user_message': message,

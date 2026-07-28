@@ -1,21 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { Send, MessageCircle, Bot, User, Loader2, X, AlertCircle } from 'lucide-react'
+import { MessageCircle, Bot, User, X, AlertCircle } from 'lucide-react'
 
 const PatientHealthAnalytics = () => {
   const { theme } = useTheme()
   const { user } = useAuth()
-  const token = localStorage.getItem('accessToken')
-  const messagesEndRef = useRef(null)
 
   // State
   const [chatOpen, setChatOpen] = useState(false)
   const [messages, setMessages] = useState([])
-  const [inputMessage, setInputMessage] = useState('')
-  const [chatLoading, setChatLoading] = useState(false)
   const [chatError, setChatError] = useState(null)
+
+  const quickQuestions = [
+    'What do my charts mean?',
+    'Is my blood pressure normal?',
+    'How can I improve my weight trend?',
+    'How many steps should I aim for?',
+    'When should I talk to a doctor?'
+  ]
+
+  const staticAnswers = {
+    'What do my charts mean?': 'Your charts show simple trends over time. The weight graph tells you whether your weight is moving up or down, and the activity graph shows how active you have been each day. Small changes over several days matter more than one day alone.',
+    'Is my blood pressure normal?': 'A blood pressure around 117/77 mmHg is generally in the normal range for many adults. If you keep seeing repeated high readings or feel unwell, you should speak with a doctor.',
+    'How can I improve my weight trend?': 'Try to keep meals balanced, drink enough water, sleep well, and stay active most days. Even a small and steady change is better than a very strict short-term diet.',
+    'How many steps should I aim for?': 'A practical target for many people is around 8,000 to 10,000 steps a day, but any increase from your current baseline is helpful. If you have a medical condition, follow your doctor’s advice.',
+    'When should I talk to a doctor?': 'Talk to a doctor if you have symptoms that do not improve, new chest pain, trouble breathing, repeated high blood pressure readings, or any test result that looks abnormal or confusing.'
+  }
 
   // Health data (mock for now - integrate with real data)
   const healthData = [
@@ -38,88 +50,35 @@ const PatientHealthAnalytics = () => {
     { date: 'Sun', steps: 8000, calories: 2000 }
   ]
 
-  // Auto-scroll to latest message
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
   // Initialize chatbot with welcome message
-  useEffect(() => {
+  React.useEffect(() => {
     if (chatOpen && messages.length === 0) {
       setMessages([{
         id: 0,
         sender: 'bot',
-        text: 'Hello! I\'m your health AI assistant. I can help you with health-related questions, analyze your health data, or provide recommendations. How can I help you today?',
+        text: 'Hello! Pick one of the questions below and I will answer in simple language.',
         timestamp: new Date()
       }])
     }
   }, [chatOpen])
 
-  // Send message to AI Chatbot API
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
-
-    // Add user message
+  const handleQuestionSelect = (question) => {
     const userMessage = {
-      id: messages.length,
+      id: Date.now(),
       sender: 'user',
-      text: inputMessage,
+      text: question,
       timestamp: new Date()
     }
-    setMessages(prev => [...prev, userMessage])
-    setInputMessage('')
-    setChatLoading(true)
-    setChatError(null)
 
-    try {
-      const response = await fetch(
-        'http://127.0.0.1:8000/api/patient/ai-chatbot/',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: inputMessage,
-            context: `User: ${user?.first_name} ${user?.last_name}. Recent health metrics available.`
-          })
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error('Failed to get AI response')
-      }
-
-      const data = await response.json()
-
-      // Add bot response
-      const botMessage = {
-        id: messages.length + 1,
-        sender: 'bot',
-        text: data.response,
-        confidence_score: data.confidence_score,
-        suggested_actions: data.suggested_actions || [],
-        timestamp: new Date()
-      }
-
-      setMessages(prev => [...prev, botMessage])
-    } catch (err) {
-      setChatError(err.message)
-      console.error('Error sending message:', err)
-
-      // Add error message
-      const errorMessage = {
-        id: messages.length + 1,
-        sender: 'bot',
-        text: `I apologize, but I couldn't process your request. Error: ${err.message}. Please try again.`,
-        isError: true,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setChatLoading(false)
+    const botMessage = {
+      id: Date.now() + 1,
+      sender: 'bot',
+      text: staticAnswers[question] || 'I can explain that in simple language, but I need a clearer question from the list below.',
+      timestamp: new Date()
     }
+
+    setMessages(prev => [...prev, userMessage, botMessage])
+    setChatError(null)
   }
 
   // Styles
@@ -252,39 +211,24 @@ const PatientHealthAnalytics = () => {
         borderColor: theme.primary || '#3b82f6'
       }
     },
-    sendButton: {
-      padding: '0.75rem 1rem',
-      backgroundColor: theme.primary || '#3b82f6',
-      color: '#fff',
-      border: 'none',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      transition: 'all 0.3s ease',
-      '&:hover': {
-        opacity: 0.9
-      }
-    },
-    suggestedActions: {
-      display: 'flex',
-      flexDirection: 'column',
+    quickQuestionGrid: {
+      display: 'grid',
+      gridTemplateColumns: '1fr',
       gap: '0.5rem',
-      marginTop: '0.5rem',
-      fontSize: '0.85rem'
+      padding: '1rem',
+      borderTop: `1px solid ${theme.borderColor || '#e5e7eb'}`,
+      backgroundColor: theme.cardBackground || '#fff'
     },
-    actionButton: {
-      padding: '0.5rem',
-      backgroundColor: (theme.background || '#f3f4f6') + '80',
+    quickQuestionButton: {
+      padding: '0.75rem 0.9rem',
+      backgroundColor: theme.background || '#f8fafc',
       border: `1px solid ${theme.borderColor || '#e5e7eb'}`,
-      borderRadius: '4px',
+      borderRadius: '10px',
       cursor: 'pointer',
       textAlign: 'left',
-      transition: 'all 0.2s ease',
-      '&:hover': {
-        backgroundColor: (theme.primary || '#3b82f6') + '20'
-      }
+      fontSize: '0.85rem',
+      color: theme.textPrimary || '#111827',
+      transition: 'all 0.2s ease'
     }
   }
 
@@ -468,56 +412,32 @@ const PatientHealthAnalytics = () => {
                   <div style={styles.messageBubble(msg.sender === 'bot')}>
                     {msg.text}
                   </div>
-                  {msg.confidence_score && (
-                    <p style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: theme.textSecondary || '#6b7280' }}>
-                      Confidence: {(msg.confidence_score * 100).toFixed(0)}%
-                    </p>
-                  )}
-                  {msg.suggested_actions && msg.suggested_actions.length > 0 && (
-                    <div style={styles.suggestedActions}>
-                      <strong style={{ fontSize: '0.8rem' }}>Suggested actions:</strong>
-                      {msg.suggested_actions.map((action, idx) => (
-                        <p key={idx} style={{ margin: '0.25rem 0', fontSize: '0.8rem' }}>
-                          • {action}
-                        </p>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
-            {chatLoading && (
-              <div style={styles.message(true)}>
-                <Bot size={20} style={{ flexShrink: 0 }} />
-                <div style={styles.messageBubble(true)}>
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
           </div>
 
-          <div style={styles.chatInput}>
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Ask a health question..."
-              style={styles.input}
-              disabled={chatLoading}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={chatLoading || !inputMessage.trim()}
-              style={{
-                ...styles.sendButton,
-                opacity: chatLoading || !inputMessage.trim() ? 0.5 : 1,
-                cursor: chatLoading || !inputMessage.trim() ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <Send size={18} />
-            </button>
+          <div style={styles.quickQuestionGrid}>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: theme.textSecondary || '#6b7280' }}>
+              Choose a question:
+            </p>
+            {quickQuestions.map((question) => (
+              <button
+                key={question}
+                onClick={() => handleQuestionSelect(question)}
+                style={styles.quickQuestionButton}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = theme.primary || '#3b82f6'
+                  e.currentTarget.style.backgroundColor = (theme.primary || '#3b82f6') + '10'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = theme.borderColor || '#e5e7eb'
+                  e.currentTarget.style.backgroundColor = theme.background || '#f8fafc'
+                }}
+              >
+                {question}
+              </button>
+            ))}
           </div>
         </div>
       )}

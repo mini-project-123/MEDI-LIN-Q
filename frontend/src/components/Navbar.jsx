@@ -12,6 +12,8 @@ const Navbar = () => {
     navigate('/')
   }
 
+  const displayName = user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'User'
+
   // Don't show navbar for doctors on dashboard (they have sidebar)
   if (user?.role === 'doctor' && window.location.pathname === '/dashboard') {
     return null
@@ -57,7 +59,7 @@ const Navbar = () => {
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <User size={20} />
-                <span>{user.name} ({user.role})</span>
+                <span>{displayName} ({user.role})</span>
               </div>
               <button 
                 onClick={handleLogout}

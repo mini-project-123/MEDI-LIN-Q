@@ -96,7 +96,12 @@ const BookAppointmentModal = ({ isOpen, onClose, onSuccess }) => {
         headers: { 'Authorization': `Bearer ${token}` },
         params: { hospital_id: selectedHospital.id }
       })
-      setDoctors(response.data || [])
+      const normalizedDoctors = (response.data || []).map((doctor) => ({
+        ...doctor,
+        id: doctor.id || doctor.doctor_id || doctor.user?.id,
+        name: doctor.name || `${doctor.user?.first_name || ''} ${doctor.user?.last_name || ''}`.trim(),
+      }))
+      setDoctors(normalizedDoctors)
     } catch (err) {
       console.error('Error fetching doctors:', err)
       setError('Failed to load doctors')
@@ -134,12 +139,8 @@ const BookAppointmentModal = ({ isOpen, onClose, onSuccess }) => {
       setTimeSlots(timeStrings)
     } catch (err) {
       console.error('Error fetching time slots:', err)
-      setError('Failed to load available time slots')
-      // Set mock time slots for demonstration
-      setTimeSlots([
-        '09:00', '10:00', '11:00', '12:00',
-        '14:00', '15:00', '16:00'
-      ])
+      setTimeSlots([])
+      setError(err.response?.data?.error || 'Failed to load available time slots from the database')
     } finally {
       setTimeSlotLoading(false)
     }
@@ -642,7 +643,6 @@ const BookAppointmentModal = ({ isOpen, onClose, onSuccess }) => {
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
-                cursor: 'pointer',
                 fontSize: '0.9rem',
                 fontWeight: '500',
                 transition: 'all 0.2s',

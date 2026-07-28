@@ -25,6 +25,7 @@ import HospitalStaff from '../components/HospitalStaff'
 import HospitalArticles from '../components/HospitalArticles'
 import HospitalAnalytics from '../components/HospitalAnalytics'
 import HospitalSettings from '../components/HospitalSettings'
+import PatientHealthAnalytics from '../components/PatientHealthAnalytics'
 // --- 1. IMPORT THE NEW HOSPITAL PROFILE PAGE (to check against) ---
 // (We don't render it here, but App.jsx does)
 import { CompleteHospitalProfile } from './CompleteHospitalProfile'
@@ -154,7 +155,7 @@ const Dashboard = () => {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'overview' && <PatientDashboard />}
+      {activeTab === 'overview' && <PatientHealthAnalytics />}
       {activeTab === 'appointments' && <PatientAppointments />}
       {activeTab === 'prescriptions' && <PatientPrescriptions />}
       {activeTab === 'reports' && <PatientReports />}
